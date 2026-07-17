@@ -3,6 +3,8 @@ import { getAdminDashboardData } from "@/lib/data";
 import { SyncButton } from "@/components/admin/SyncButton";
 import { GlassCard } from "@/components/ui/GlassCard";
 
+export { dynamic } from "@/lib/page-config";
+
 function consultationStatusLabel(status: string) {
   if (status === "DONE") {
     return {

@@ -35,7 +35,8 @@ export function maskAuthor(name: string): string {
   return `${t[0]}**`;
 }
 
-export function displayQaTitle(question: string, _isSecret: boolean, _unlocked: boolean): string {
+export function displayQaTitle(question: string, ..._flags: boolean[]): string {
+  void _flags;
   return question;
 }
 

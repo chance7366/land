@@ -6,6 +6,7 @@
     "dev": "node ./node_modules/next/dist/bin/next dev",
     "build": "node ./node_modules/next/dist/bin/next build",
     "start": "node ./node_modules/next/dist/bin/next start",
+    "postinstall": "prisma generate",
     "lint": "node ./node_modules/eslint/bin/eslint.js .",
     "sync": "powershell -ExecutionPolicy Bypass -File ./scripts/sync-dev.ps1",
     "serve:stable": "powershell -ExecutionPolicy Bypass -File ./scripts/serve-stable.ps1",

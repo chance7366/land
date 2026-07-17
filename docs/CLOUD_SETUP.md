@@ -142,12 +142,15 @@ Vercel 프로젝트 → **Settings** → **Environment Variables**
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase Project URL | Production, Preview, Development |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon public key | Production, Preview, Development |
 | `SUPABASE_SERVICE_ROLE_KEY` | service_role (비밀) | Production, Preview |
+| `DATABASE_URL` | `file:./dev.db` (빌드용 placeholder; SQLite는 Vercel에서 동작하지 않음) | Production, Preview |
 | `SESSION_SECRET` | 긴 랜덤 문자열 | Production, Preview |
 | `ADMIN_AUTH_ENABLED` | `true` | Production |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | 관리자 계정 | Production |
 | `APP_BASE_URL` | `https://your-app.vercel.app` | Production |
 | `SOLAPI_API_KEY` 등 | Solapi 값 | Production |
 | `GMAIL_USER` / `GMAIL_APP_PASSWORD` | 메일 발송 시 | Production |
+
+**빌드 실패(`/admin` prerender) 주의:** 관리자·DB 페이지는 `force-dynamic`이며, Vercel에는 위 환경변수를 넣은 뒤 Redeploy 하세요. `DATABASE_URL`이 없으면 `prisma generate`가 실패할 수 있습니다.
 
 저장 후 **Deployments → Redeploy** 하여 환경변수를 반영하세요.
 
