@@ -9,6 +9,9 @@ import { AuctionSplitBoard } from "@/components/auction/split/AuctionSplitBoard"
 import { serializeAuction } from "@/lib/auction-split-view";
 import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
+import { isSupabaseEnabled } from "@/lib/supabase/config";
+import { listAuctionsFromSupabase } from "@/lib/supabase/repos/catalog";
+import type { Auction } from "@prisma/client";
 
 export const metadata: Metadata = {
   title: "경매물건 | 찬스부동산 경매중개",
@@ -27,12 +30,16 @@ export default async function AuctionsPage({ searchParams }: PageProps) {
 
   const items = await withDbFallback(
     "auctions-page",
-    () =>
-      prisma.auction.findMany({
+    async () => {
+      if (isSupabaseEnabled()) {
+        return listAuctionsFromSupabase() as Promise<Auction[]>;
+      }
+      return prisma.auction.findMany({
         where: { status: "ONGOING" },
         orderBy: [{ featured: "desc" }, { dDay: "asc" }],
-      }),
-    [],
+      });
+    },
+    [] as Auction[],
   );
 
   return (

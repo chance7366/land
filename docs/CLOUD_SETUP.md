@@ -1,5 +1,7 @@
 # 클라우드 전환 가이드 (Supabase + GitHub + Vercel)
 
+> **지금 바로 연동:** 체크리스트는 [`SUPABASE_CONNECT_NOW.md`](./SUPABASE_CONNECT_NOW.md) 를 보세요.
+
 로컬 SQLite/Prisma 개발을 유지한 채, Supabase·GitHub·Vercel로 배포 파이프라인을 구축하는 순서입니다.
 
 ---

@@ -7,6 +7,8 @@ import { SuccessStoryBoardClient } from "@/components/success-stories/SuccessSto
 import { maskStoryAuthor } from "@/lib/success-story";
 import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
+import { isSupabaseEnabled } from "@/lib/supabase/config";
+import { listSuccessStoriesFromSupabase } from "@/lib/supabase/repos/catalog";
 
 export const metadata: Metadata = {
   title: "성공스토리 | 찬스부동산 경매중개",
@@ -25,12 +27,14 @@ export default async function SuccessStoriesPage({
   const { id: openId } = await searchParams;
   const rows = await withDbFallback(
     "success-stories-page",
-    () =>
-      prisma.successStory.findMany({
+    async () => {
+      if (isSupabaseEnabled()) return listSuccessStoriesFromSupabase(200);
+      return prisma.successStory.findMany({
         where: { status: "PUBLISHED" },
         orderBy: { createdAt: "desc" },
         take: 200,
-      }),
+      });
+    },
     [],
   );
 

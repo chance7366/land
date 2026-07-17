@@ -14,6 +14,12 @@ import { getProperties, getPropertyCategoryCounts } from "@/lib/property-service
 import { parsePropertyListFilters } from "@/lib/property-fields";
 import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
+import { isSupabaseEnabled } from "@/lib/supabase/config";
+import {
+  getPropertyCategoryCountsFromSupabase,
+  listPropertiesFromSupabase,
+  listPropertyRegionsFromSupabase,
+} from "@/lib/supabase/repos/catalog";
 import type { PropertyCategory } from "@prisma/client";
 
 export const metadata: Metadata = {
@@ -50,6 +56,18 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
   const { items, counts, regions } = await withDbFallback(
     "properties-page",
     async () => {
+      if (isSupabaseEnabled()) {
+        const [list, categoryCounts, regionList] = await Promise.all([
+          listPropertiesFromSupabase(filters),
+          getPropertyCategoryCountsFromSupabase(),
+          listPropertyRegionsFromSupabase(),
+        ]);
+        return {
+          items: list as Awaited<ReturnType<typeof getProperties>>,
+          counts: categoryCounts,
+          regions: regionList,
+        };
+      }
       const [list, categoryCounts, regionRows] = await Promise.all([
         getProperties(filters),
         getPropertyCategoryCounts(),

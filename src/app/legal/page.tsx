@@ -7,6 +7,8 @@ import { QaBoardClient } from "@/components/legal/QaBoardClient";
 import { maskAuthor } from "@/lib/qa";
 import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
+import { isSupabaseEnabled } from "@/lib/supabase/config";
+import { listLegalQuestionsFromSupabase } from "@/lib/supabase/repos/catalog";
 
 export const metadata: Metadata = {
   title: "찬스상담소 | 찬스부동산 경매중개",
@@ -21,11 +23,13 @@ export default async function LegalPage({ searchParams }: { searchParams: Search
   const { id: openId } = await searchParams;
   const rows = await withDbFallback(
     "legal-page",
-    () =>
-      prisma.legalQuestion.findMany({
+    async () => {
+      if (isSupabaseEnabled()) return listLegalQuestionsFromSupabase(100);
+      return prisma.legalQuestion.findMany({
         orderBy: { createdAt: "desc" },
         take: 100,
-      }),
+      });
+    },
     [],
   );
 
