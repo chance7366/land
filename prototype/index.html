@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html class="light" lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>CHANCE AUCTION | 내포신도시 부동산 &amp; 경매 전문</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&amp;family=Work+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary-container": "#b18d48",
+                    "secondary-container": "#b9eeab",
+                    "surface": "#f8f9fa",
+                    "surface-tint": "#4e5e81",
+                    "on-primary-fixed": "#081b3a",
+                    "surface-container-low": "#f3f4f5",
+                    "surface-dim": "#d9dadb",
+                    "surface-container-lowest": "#ffffff",
+                    "on-secondary-container": "#3f6d38",
+                    "tertiary-fixed-dim": "#e9c176",
+                    "secondary": "#3b6934",
+                    "surface-container": "#edeeef",
+                    "primary": "#031635",
+                    "on-secondary": "#ffffff",
+                    "background": "#f8f9fa",
+                    "secondary-fixed-dim": "#a1d494",
+                    "outline-variant": "#c5c6cf",
+                    "on-primary-container": "#8293b8",
+                    "on-tertiary-fixed-variant": "#5d4201",
+                    "on-error-container": "#93000a",
+                    "surface-container-high": "#e7e8e9",
+                    "error-container": "#ffdad6",
+                    "on-primary": "#ffffff",
+                    "inverse-primary": "#b6c6ef",
+                    "primary-container": "#1a2b4b",
+                    "tertiary-fixed": "#ffdea5",
+                    "on-background": "#191c1d",
+                    "secondary-fixed": "#bcf0ae",
+                    "on-secondary-fixed": "#002201",
+                    "on-surface": "#191c1d",
+                    "on-error": "#ffffff",
+                    "on-secondary-fixed-variant": "#23501e",
+                    "primary-fixed": "#d8e2ff",
+                    "surface-bright": "#f8f9fa",
+                    "on-primary-fixed-variant": "#364768",
+                    "inverse-surface": "#2e3132",
+                    "on-tertiary-fixed": "#261900",
+                    "tertiary-container": "#3a2800",
+                    "surface-container-highest": "#e1e3e4",
+                    "inverse-on-surface": "#f0f1f2",
+                    "outline": "#75777f",
+                    "on-surface-variant": "#44474e",
+                    "error": "#ba1a1a",
+                    "tertiary": "#211500",
+                    "primary-fixed-dim": "#b6c6ef",
+                    "on-tertiary": "#ffffff",
+                    "surface-variant": "#e1e3e4"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "section-gap": "4rem",
+                    "container-padding-mobile": "1.25rem",
+                    "container-padding-desktop": "2.5rem",
+                    "gutter": "1rem",
+                    "base": "8px"
+            },
+            "fontFamily": {
+                    "headline-lg-mobile": ["Plus Jakarta Sans"],
+                    "body-md": ["Work Sans"],
+                    "data-numeral": ["Work Sans"],
+                    "headline-lg": ["Plus Jakarta Sans"],
+                    "headline-md": ["Plus Jakarta Sans"],
+                    "body-lg": ["Work Sans"],
+                    "label-md": ["Work Sans"],
+                    "display-lg": ["Plus Jakarta Sans"]
+            },
+            "fontSize": {
+                    "headline-lg-mobile": ["28px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "data-numeral": ["20px", {"lineHeight": "1", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                    "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "label-md": ["14px", {"lineHeight": "1.2", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                    "display-lg": ["48px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+    <style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+        }
+        .bg-glass {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+        }
+        .property-card-shadow {
+            box-shadow: 0px 4px 20px rgba(3, 22, 53, 0.04);
+        }
+        .column-divider {
+            border-left: 1px solid rgba(117, 119, 127, 0.1);
+        }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #031635; border-radius: 10px; }
+
+        .horizontal-scroll {
+            display: flex;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .horizontal-scroll::-webkit-scrollbar { display: none; }
+        .scroll-item {
+            flex: 0 0 85%;
+            scroll-snap-align: center;
+            margin-right: 1rem;
+        }
+        @media (min-width: 768px) {
+            .scroll-item {
+                flex: 0 0 calc(25% - 1rem);
+            }
+        }
+    </style>
+</head>
+<body class="text-on-surface font-body-md overflow-x-hidden bg-background">
+
+<!-- Top Navigation Bar -->
+<header class="sticky top-0 w-full z-50 flex justify-between items-center px-container-padding-mobile py-4 bg-surface shadow-sm">
+    <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-primary text-2xl" data-icon="gavel">gavel</span>
+        <h1 class="font-headline-md text-primary font-bold tracking-tight">CHANCE</h1>
+    </div>
+    <button class="bg-primary text-on-primary px-4 py-2 rounded-full font-label-md text-label-md hover:opacity-90 transition-all">상담 예약</button>
+</header>
+
+<main class="pb-24">
+    <!-- Dashboard Style Layout -->
+    <div id="dashboard-scroll" class="flex overflow-x-auto gap-4 p-4 md:p-6 snap-x snap-mandatory scroll-smooth">
+        <!-- Category: 일반중개 -->
+        <section class="flex-shrink-0 w-[300px] md:w-[340px] snap-start flex flex-col gap-4">
+            <div class="flex justify-between items-center px-2">
+                <h2 class="font-headline-md text-primary flex items-center gap-2">
+                    일반중개 <span class="text-xs bg-surface-container-high px-2 py-0.5 rounded-full font-normal text-on-surface-variant">12건</span>
+                </h2>
+                <span class="material-symbols-outlined text-outline cursor-pointer" data-icon="more_horiz">more_horiz</span>
+            </div>
+            <div class="bg-surface-container-low rounded-2xl p-4 flex flex-col gap-4 min-h-[600px] border-t-4 border-secondary shadow-md">
+                <!-- Featured Property Card -->
+                <div class="bg-white rounded-xl shadow-sm p-3 border border-outline-variant/30">
+                    <img alt="Property" class="w-full object-cover rounded-lg mb-3 h-24" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBd6fN5VARDKhhov0D0M1uMNdvIVuEx2yukgoy9_lqjtYlEWOgOAKv6K7ee7DsEoP8zuNxNEPNrrx1RL57PD1mDX-T1NKEp8x_GaX_H4Gba5jEpFXIBBuOuVo6moX-F1p8Et55wggqISUYRHpxZfXpyfyRieccW0XKTSxtEYlDD81Xzdk6YvFRjngOgQjM0DR1xJBxpL2T88qeBijWznFxP25_ayibl4vfBC6dRsdazpnQyLk5uQn5E">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs font-bold text-secondary">매매</span>
+                        <span class="text-[10px] text-outline">2024-05-20</span>
+                    </div>
+                    <h3 class="font-bold text-sm mb-1">내포신도시 아파트 A타입</h3>
+                    <p class="text-xs text-on-surface-variant line-clamp-2 mb-3">전망 좋은 고층 매물로 즉시 입주 가능합니다. 로열동 로열층...</p>
+                    <div class="flex items-center gap-2 text-primary font-bold">
+                        <span class="material-symbols-outlined text-sm">payments</span>
+                        <span class="text-sm">4억 2,000</span>
+                    </div>
+                </div>
+                <!-- Text List Items -->
+                <div class="space-y-4 px-1">
+                    <div class="border-b border-outline-variant/30 pb-3 group cursor-pointer">
+                        <h4 class="text-sm font-medium group-hover:text-secondary transition-colors truncate">홍성 중심가 상가 임대 1층 20평</h4>
+                        <p class="text-[11px] text-on-surface-variant mt-1">유동인구 많은 대로변 위치...</p>
+                    </div>
+                    <div class="border-b border-outline-variant/30 pb-3 group cursor-pointer">
+                        <h4 class="text-sm font-medium group-hover:text-secondary transition-colors truncate">단독주택 부지 급매 120평</h4>
+                        <p class="text-[11px] text-on-surface-variant mt-1">용봉산 조망권 확보된 평탄지...</p>
+                    </div>
+                    <div class="border-b border-outline-variant/30 pb-3 group cursor-pointer">
+                        <h4 class="text-sm font-medium group-hover:text-secondary transition-colors truncate">내포 프리미엄 오피스텔 분양권</h4>
+                        <p class="text-[11px] text-on-surface-variant mt-1">입주 예정일 협의 가능...</p>
+                    </div>
+                </div>
+                <button class="mt-auto text-center py-2 text-xs font-bold text-primary hover:bg-white/50 rounded-lg">전체 매물 보기</button>
+            </div>
+        </section>
+
+        <!-- Category: 경매물건추천 -->
+        <section class="flex-shrink-0 w-[300px] md:w-[340px] snap-start flex flex-col gap-4">
+            <div class="flex justify-between items-center px-2">
+                <h2 class="font-headline-md text-primary flex items-center gap-2">
+                    경매물건추천 <span class="text-xs bg-surface-container-high px-2 py-0.5 rounded-full font-normal text-on-surface-variant">8건</span>
+                </h2>
+                <span class="material-symbols-outlined text-outline cursor-pointer" data-icon="more_horiz">more_horiz</span>
+            </div>
+            <div class="bg-primary rounded-2xl p-4 flex flex-col gap-4 min-h-[600px] border-t-4 border-error">
+                <!-- Featured Auction Card -->
+                <div class="bg-primary-container rounded-xl p-3 border border-on-primary-container/20">
+                    <div class="relative mb-3">
+                        <img alt="Auction" class="w-full object-cover rounded-lg h-24" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBw745RBSBSt-Ag2mJ6879aLJmT1bo8x77brSA357cPTStWZE-XIVyxr0Tnh6yd8v_eJBvjGX0dppL8Ufk-xtvRFmLEw-cym0KQHzN1NfWKYCLmmCLnZrcYB3ZpiMfo7xdXuIiENMxkFqOKxWX7GIrru4oKAhfeCfxh6hGIH8_ye1GFBU_4aBCOeQP8Z1m0pJ69pLAC3wn17yusP6-gQnJKDUXscboq_Y4J0pJJuSj8mO9Vu6NN3TaJ">
+                        <span class="absolute top-2 left-2 bg-error text-white text-[10px] px-2 py-0.5 rounded-full font-bold">진행중</span>
+                    </div>
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-[10px] text-on-primary-container">2023타경 12345</span>
+                        <span class="text-[10px] text-secondary-fixed font-bold">안전</span>
+                    </div>
+                    <h3 class="font-bold text-sm text-white mb-3">골든타워 상가 3층</h3>
+                    <div class="space-y-1 text-xs mb-4">
+                        <div class="flex justify-between">
+                            <span class="text-on-primary-container">감정가</span>
+                            <span class="text-white">₩7.2억</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-on-primary-container">추천가</span>
+                            <span class="text-secondary-fixed text-sm font-bold">₩5.1억</span>
+                        </div>
+                    </div>
+                    <button class="w-full py-2 bg-white text-primary text-xs font-bold rounded-lg">분석 리포트</button>
+                </div>
+                <!-- Auction List Items -->
+                <div class="space-y-4 px-1">
+                    <div class="border-b border-on-primary-container/20 pb-3 group cursor-pointer">
+                        <div class="flex justify-between">
+                            <h4 class="text-sm font-medium text-white group-hover:text-secondary-fixed transition-colors truncate">한양수자인 110동 15층</h4>
+                            <span class="text-[10px] text-on-primary-container">D-7</span>
+                        </div>
+                        <p class="text-[11px] text-on-primary-container mt-1">대항력 없는 임차인, 명도 용이...</p>
+                    </div>
+                    <div class="border-b border-on-primary-container/20 pb-3 group cursor-pointer">
+                        <div class="flex justify-between">
+                            <h4 class="text-sm font-medium text-white group-hover:text-secondary-fixed transition-colors truncate">근린생활시설 용지 150평</h4>
+                            <span class="text-[10px] text-on-primary-container">D-14</span>
+                        </div>
+                        <p class="text-[11px] text-on-primary-container mt-1">최저가 하락으로 수익성 극대화...</p>
+                    </div>
+                    <div class="border-b border-on-primary-container/20 pb-3 group cursor-pointer">
+                        <div class="flex justify-between">
+                            <h4 class="text-sm font-medium text-white group-hover:text-secondary-fixed transition-colors truncate">이지더원 2차 저층 급매물</h4>
+                            <span class="text-[10px] text-on-primary-container">D-21</span>
+                        </div>
+                        <p class="text-[11px] text-on-primary-container mt-1">실거주 및 투자 동시 만족...</p>
+                    </div>
+                </div>
+                <button class="mt-auto text-center py-2 text-xs font-bold text-on-primary-container hover:text-white rounded-lg">경매 물건 리스트</button>
+            </div>
+        </section>
+
+        <!-- Category: 부동산소식 -->
+        <section class="flex-shrink-0 w-[300px] md:w-[340px] snap-start flex flex-col gap-4">
+            <div class="flex justify-between items-center px-2">
+                <h2 class="font-headline-md text-primary flex items-center gap-2">
+                    부동산소식 <span class="text-xs bg-surface-container-high px-2 py-0.5 rounded-full font-normal text-on-surface-variant">25건</span>
+                </h2>
+                <span class="material-symbols-outlined text-outline cursor-pointer" data-icon="more_horiz">more_horiz</span>
+            </div>
+            <div class="bg-surface-container-low rounded-2xl p-4 flex flex-col gap-4 min-h-[600px] border-t-4 border-on-tertiary-container shadow-md">
+                <!-- Featured News Card -->
+                <div class="bg-white rounded-xl shadow-sm p-3 border border-outline-variant/30">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-primary">
+                            <span class="material-symbols-outlined">newspaper</span>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-sm">내포신도시 개발 계획 발표</h3>
+                            <p class="text-[10px] text-outline">2024-05-19 14:30</p>
+                        </div>
+                    </div>
+                    <p class="text-xs text-on-surface-variant mb-4 leading-relaxed">충청남도와 홍성군이 공동 발표한 제3차 국가산업단지 조성 계획에 내포신도시가 핵심 거점으로 선정되었습니다. 이에 따른...</p>
+                    <img alt="News" class="w-full h-24 object-cover rounded-lg opacity-80" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB3GiMJwP-aOwjOcQE7YkThX4ixXAyRHy_XwKGoN6NblpljNadXs5t3V61hFcIplwvr4LhYUuAqMVKIWA9aeYwILe2Jas9CAZfcmlv7gCAdHcaYZkYstm_SC2Cv1sQOGRi15g3OGi4Z20VgYG5BOran2QMkgnd_RHAZj9ZOoWaWpwQe3g0Ih_CapSZ2wQXJX0_XWMkenEJNQDsa5MRgiOuYQIQlpzm9AzSVAVEPCuOPPQ4-27m_jiKc">
+                </div>
+                <!-- News List -->
+                <div class="space-y-4 px-1">
+                    <div class="border-b border-outline-variant/30 pb-3 group cursor-pointer">
+                        <h4 class="text-sm font-medium group-hover:text-primary transition-colors">내포-홍성 광역철도 연장 확정</h4>
+                        <p class="text-[10px] text-outline mt-1">주변 토지 및 아파트 거래 활성화 기대...</p>
+                    </div>
+                    <div class="border-b border-outline-variant/30 pb-3 group cursor-pointer">
+                        <h4 class="text-sm font-medium group-hover:text-primary transition-colors">6월 부동산 정책 변화 핵심 정리</h4>
+                        <p class="text-[10px] text-outline mt-1">취득세 및 보유세 감면 혜택 상세 분석...</p>
+                    </div>
+                    <div class="border-b border-outline-variant/30 pb-3 group cursor-pointer">
+                        <h4 class="text-sm font-medium group-hover:text-primary transition-colors">내포 종합병원 건립 사업 속도</h4>
+                        <p class="text-[10px] text-outline mt-1">의료 정주 여건 개선으로 인구 유입 가속...</p>
+                    </div>
+                    <div class="border-b border-outline-variant/30 pb-3 group cursor-pointer">
+                        <h4 class="text-sm font-medium group-hover:text-primary transition-colors">금주 내포신도시 아파트 시세 동향</h4>
+                        <p class="text-[10px] text-outline mt-1">대단지 위주로 완만한 회복세 기록 중...</p>
+                    </div>
+                </div>
+                <button class="mt-auto text-center py-2 text-xs font-bold text-primary hover:bg-white/50 rounded-lg">뉴스룸 바로가기</button>
+            </div>
+        </section>
+
+        <!-- Category: 법률상담 -->
+        <section class="flex-shrink-0 w-[300px] md:w-[340px] snap-start flex flex-col gap-4">
+            <div class="flex justify-between items-center px-2">
+                <h2 class="font-headline-md text-primary flex items-center gap-2">
+                    법률상담 <span class="text-xs bg-surface-container-high px-2 py-0.5 rounded-full font-normal text-on-surface-variant">Q&amp;A</span>
+                </h2>
+                <span class="material-symbols-outlined text-outline cursor-pointer" data-icon="more_horiz">more_horiz</span>
+            </div>
+            <div class="bg-surface-container-low rounded-2xl p-4 flex flex-col gap-4 min-h-[600px] border-t-4 border-primary shadow-md">
+                <div class="bg-white rounded-xl shadow-sm p-4 border border-outline-variant/30">
+                    <div class="flex gap-2 mb-3">
+                        <span class="bg-primary/10 text-primary text-[10px] px-2 py-0.5 rounded font-bold">임대차</span>
+                        <span class="bg-primary/10 text-primary text-[10px] px-2 py-0.5 rounded font-bold">답변완료</span>
+                    </div>
+                    <h3 class="font-bold text-sm mb-2">계약 만료 전 퇴거 시 복비 문제</h3>
+                    <p class="text-xs text-on-surface-variant mb-4">"임대차 계약 기간이 3개월 남았는데 피치 못할 사정으로 이사를 가야 합니다. 중개 수수료는 누가..."</p>
+                    <div class="bg-surface-container-lowest p-3 rounded-lg border-l-2 border-primary">
+                        <p class="text-[11px] font-medium text-primary mb-1">찬스 법률자문단 답변</p>
+                        <p class="text-[11px] text-on-surface-variant line-clamp-2">통상적으로 계약 기간을 채우지 못하고 퇴거할 경우 임차인이 수수료를 부담하는 관례가 있으나...</p>
+                    </div>
+                </div>
+                <div class="space-y-4 mt-2 px-1">
+                    <div class="flex items-center gap-3 group cursor-pointer border-b border-outline-variant/30 pb-3">
+                        <span class="text-primary font-bold">Q</span>
+                        <div>
+                            <h4 class="text-sm font-medium group-hover:text-primary transition-colors">경매 낙찰 후 명도 절차 기간?</h4>
+                            <p class="text-[10px] text-outline mt-0.5">답변 대기 중 • 1시간 전</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 group cursor-pointer border-b border-outline-variant/30 pb-3">
+                        <span class="text-primary font-bold">Q</span>
+                        <div>
+                            <h4 class="text-sm font-medium group-hover:text-primary transition-colors">토지 용도 변경 가능성 문의</h4>
+                            <p class="text-[10px] text-outline mt-0.5">답변 완료 • 3시간 전</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 group cursor-pointer border-b border-outline-variant/30 pb-3">
+                        <span class="text-primary font-bold">Q</span>
+                        <div>
+                            <h4 class="text-sm font-medium group-hover:text-primary transition-colors">증여 취득세 계산법이 궁금합니다</h4>
+                            <p class="text-[10px] text-outline mt-0.5">답변 완료 • 5시간 전</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-auto p-4 bg-primary rounded-xl text-center">
+                    <p class="text-white text-xs font-bold mb-3">변호사/세무사 1:1 맞춤 상담</p>
+                    <button class="w-full py-2 bg-secondary text-on-secondary text-xs font-bold rounded-lg shadow-md">상담 신청하기</button>
+                </div>
+            </div>
+        </section>
+    </div>
+</main>
+
+<!-- Floating Action Button -->
+<button class="fixed bottom-20 right-6 z-[60] bg-secondary text-on-secondary w-14 h-14 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform" aria-label="채팅 상담">
+    <span class="material-symbols-outlined text-2xl" data-icon="chat">chat</span>
+</button>
+
+<!-- Mobile Bottom Nav -->
+<nav class="fixed bottom-0 left-0 w-full bg-white border-t border-outline-variant/30 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] grid grid-cols-4 py-3 z-50">
+    <a class="flex flex-col items-center gap-1 text-primary" href="#">
+        <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">home</span>
+        <span class="text-[10px] font-bold">일반중개</span>
+    </a>
+    <a class="flex flex-col items-center gap-1 text-on-surface-variant hover:text-primary transition-colors" href="#">
+        <span class="material-symbols-outlined">gavel</span>
+        <span class="text-[10px] font-medium">경매물건</span>
+    </a>
+    <a class="flex flex-col items-center gap-1 text-on-surface-variant hover:text-primary transition-colors" href="#">
+        <span class="material-symbols-outlined">newspaper</span>
+        <span class="text-[10px] font-medium">부동산소식</span>
+    </a>
+    <a class="flex flex-col items-center gap-1 text-on-surface-variant hover:text-primary transition-colors" href="#">
+        <span class="material-symbols-outlined">legal_services</span>
+        <span class="text-[10px] font-medium">법률상담</span>
+    </a>
+</nav>
+
+<script>
+    // Smooth snap scroll helper (mouse drag on desktop)
+    const container = document.getElementById('dashboard-scroll');
+    let isDown = false;
+    let startX;
+    let scrollLeft;
+
+    container.addEventListener('mousedown', (e) => {
+        isDown = true;
+        container.classList.add('cursor-grabbing');
+        startX = e.pageX - container.offsetLeft;
+        scrollLeft = container.scrollLeft;
+    });
+
+    container.addEventListener('mouseleave', () => {
+        isDown = false;
+        container.classList.remove('cursor-grabbing');
+    });
+
+    container.addEventListener('mouseup', () => {
+        isDown = false;
+        container.classList.remove('cursor-grabbing');
+    });
+
+    container.addEventListener('mousemove', (e) => {
+        if (!isDown) return;
+        e.preventDefault();
+        const x = e.pageX - container.offsetLeft;
+        const walk = (x - startX) * 1.5;
+        container.scrollLeft = scrollLeft - walk;
+    });
+
+    // Bottom nav: scroll to matching section
+    const sections = container.querySelectorAll('section');
+    const navLinks = document.querySelectorAll('nav a');
+
+    navLinks.forEach((link, index) => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            sections[index]?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+
+            navLinks.forEach((l) => {
+                l.classList.remove('text-primary');
+                l.classList.add('text-on-surface-variant');
+                l.querySelector('.material-symbols-outlined').style.fontVariationSettings = "'FILL' 0";
+                l.querySelector('span:last-child').classList.replace('font-bold', 'font-medium');
+            });
+
+            link.classList.remove('text-on-surface-variant');
+            link.classList.add('text-primary');
+            link.querySelector('.material-symbols-outlined').style.fontVariationSettings = "'FILL' 1";
+            link.querySelector('span:last-child').classList.replace('font-medium', 'font-bold');
+        });
+    });
+</script>
+
+</body>
+</html>

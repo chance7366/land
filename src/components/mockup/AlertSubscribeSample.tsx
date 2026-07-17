@@ -1,0 +1,519 @@
+"use client";
+
+import { useEffect, useId, useState } from "react";
+import {
+  Bell,
+  Building2,
+  CalendarDays,
+  Check,
+  FileText,
+  Gavel,
+  Mail,
+  MessageCircle,
+  Phone,
+  PlayCircle,
+  Sparkles,
+  X,
+} from "lucide-react";
+import { AppLink as Link } from "@/components/ui/AppLink";
+import { GlassCard } from "@/components/ui/GlassCard";
+import { HeroBackgroundSlideshow } from "@/components/landing/HeroBackgroundSlideshow";
+
+type AlertType = "property" | "auction";
+type ChannelId = "EMAIL" | "SMS" | "KAKAO";
+
+const PROPERTY_CATEGORIES = [
+  { value: "APARTMENT", label: "아파트" },
+  { value: "OFFICETEL", label: "오피스텔" },
+  { value: "RETAIL", label: "상가" },
+  { value: "LAND", label: "토지" },
+  { value: "DETACHED", label: "단독" },
+  { value: "ROW_HOUSE", label: "빌라" },
+] as const;
+
+const DEAL_OPTIONS = [
+  { value: "SALE", label: "매매" },
+  { value: "JEONSE", label: "전세" },
+  { value: "MONTHLY", label: "월세" },
+] as const;
+
+const REGIONS = ["홍성군", "예산군", "보령시", "서산시", "당진시", "아산시"] as const;
+const AUCTION_TYPES = ["아파트", "주택", "상가", "토지", "공장"] as const;
+
+function toggleInList(list: string[], value: string) {
+  return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+}
+
+/** 샘플 v2 — 한 화면 · 중앙 모달 · 히어로 배경 · 스크롤 없음 */
+export function AlertSubscribeSample() {
+  const titleId = useId();
+  const [open, setOpen] = useState(false);
+  const [alertType, setAlertType] = useState<AlertType>("property");
+  const [channels, setChannels] = useState<ChannelId[]>(["EMAIL"]);
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [name, setName] = useState("");
+  const [categories, setCategories] = useState<string[]>(["APARTMENT"]);
+  const [deals, setDeals] = useState<string[]>(["SALE"]);
+  const [regions, setRegions] = useState<string[]>(["홍성군"]);
+  const [auctionTypes, setAuctionTypes] = useState<string[]>(["아파트"]);
+  const [appraisalMin, setAppraisalMin] = useState("");
+  const [appraisalMax, setAppraisalMax] = useState("");
+  const [agreed, setAgreed] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const needEmail = channels.includes("EMAIL");
+  const needPhone = channels.includes("SMS") || channels.includes("KAKAO");
+
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  function openModal() {
+    setMsg("");
+    setAgreed(false);
+    setOpen(true);
+  }
+
+  function toggleChannel(c: ChannelId) {
+    setChannels((prev) => {
+      if (prev.includes(c)) {
+        if (prev.length === 1) return prev;
+        return prev.filter((x) => x !== c);
+      }
+      return [...prev, c];
+    });
+  }
+
+  function submit() {
+    if (!agreed) {
+      setMsg("개인정보 수집·이용에 동의해 주세요.");
+      return;
+    }
+    if (needEmail && !email.trim()) {
+      setMsg("이메일을 입력해 주세요.");
+      return;
+    }
+    if (needPhone && !phone.trim()) {
+      setMsg("휴대폰 번호를 입력해 주세요.");
+      return;
+    }
+    if (!regions.length) {
+      setMsg("관심 지역을 선택해 주세요.");
+      return;
+    }
+    if (alertType === "property" && (!categories.length || !deals.length)) {
+      setMsg("매물·거래 유형을 선택해 주세요.");
+      return;
+    }
+    if (alertType === "auction" && !auctionTypes.length) {
+      setMsg("경매 유형을 선택해 주세요.");
+      return;
+    }
+    setMsg("신청이 접수되었습니다. (샘플)");
+    setTimeout(() => setOpen(false), 1100);
+  }
+
+  return (
+    <div className="mx-auto max-w-6xl px-container-padding-mobile py-8 md:px-8 md:py-12">
+      <GlassCard className="mb-6 overflow-hidden p-0">
+        <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3 md:px-5">
+          <p className="truncate bg-gradient-to-r from-blue-400 via-cyan-400 to-violet-400 bg-clip-text font-['Times_New_Roman',serif] text-sm font-bold text-transparent md:text-base">
+            CHANCE REAL ESTATE &amp; AUCTION
+          </p>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              onClick={openModal}
+              className="inline-flex items-center justify-center gap-1 rounded-lg border border-amber-400/40 bg-gradient-to-b from-amber-400/25 to-amber-600/10 px-2 py-2 text-[11px] font-bold text-landing-text shadow-[0_0_16px_rgba(251,191,36,0.15)] transition hover:border-amber-300/60 hover:shadow-[0_0_22px_rgba(251,191,36,0.28)] sm:px-2.5"
+            >
+              <Bell className="h-4 w-4 shrink-0 text-amber-300" aria-hidden />
+              <span className="hidden sm:inline">맞춤 알림</span>
+            </button>
+            <span className="inline-flex items-center justify-center gap-1 rounded-lg border border-landing-border bg-violet-500/15 px-2 py-2 text-[11px] font-bold text-landing-text sm:px-2.5">
+              <CalendarDays className="h-4 w-4 shrink-0 text-violet-400" aria-hidden />
+              <span className="hidden sm:inline">상담 예약</span>
+            </span>
+            <span className="hidden items-center justify-center gap-1 rounded-lg border border-landing-border bg-landing-card px-2 py-2 text-[11px] font-bold sm:inline-flex sm:px-2.5">
+              <PlayCircle className="h-4 w-4 text-red-500" aria-hidden />
+              YouTube
+            </span>
+            <span className="hidden items-center justify-center gap-1 rounded-lg border border-landing-border bg-[#03c75a]/10 px-2 py-2 text-[11px] font-bold sm:inline-flex sm:px-2.5">
+              <FileText className="h-4 w-4 text-[#03c75a]" aria-hidden />
+              네이버 블로그
+            </span>
+          </div>
+        </div>
+        <div className="px-4 py-5 md:px-5">
+          <p className="text-xs font-bold tracking-wide text-amber-200/90">샘플 v2 · 프로덕션 미적용</p>
+          <h1 className="mt-1 text-2xl font-extrabold text-white md:text-3xl">맞춤 알림 · 한 화면 모달</h1>
+          <p className="mt-2 max-w-2xl text-sm text-white/60">
+            유형 선택을 상단 탭으로 두고, 조건·채널을 한 화면에서 고릅니다. 모달은 화면 중앙에 뜨며 스크롤
+            없이 전체가 보이도록 압축했습니다.
+          </p>
+          <button
+            type="button"
+            onClick={openModal}
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 via-[#4dabff] to-[#913dff] px-5 py-2.5 text-sm font-extrabold text-white shadow-[0_8px_28px_rgba(77,171,255,0.35)] transition hover:brightness-110"
+          >
+            <Sparkles className="h-4 w-4" aria-hidden />
+            맞춤 알림 열기
+          </button>
+        </div>
+      </GlassCard>
+
+      <GlassCard className="p-4 text-xs leading-relaxed text-white/45 md:p-5">
+        <p className="font-bold text-white/70">이번 샘플에서 확인할 점</p>
+        <ul className="mt-2 list-disc space-y-1 pl-4">
+          <li>상단: 부동산매매 / 경매물건 전환 (별도 1단계 없음)</li>
+          <li>모니터 중앙 고정 · 닫기(X) · body 스크롤 잠금</li>
+          <li>패널 내부 스크롤바 없음 · 히어로 슬라이드+오로라 배경</li>
+          <li>
+            관리자 샘플:{" "}
+            <Link href="/mockup/alert-subscribe/admin" className="text-[#4dabff] hover:underline">
+              /mockup/alert-subscribe/admin
+            </Link>
+          </li>
+        </ul>
+      </GlassCard>
+
+      {open ? (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          style={{ position: "fixed", inset: 0 }}
+        >
+          {/* dim */}
+          <button
+            type="button"
+            aria-label="닫기"
+            className="absolute inset-0 bg-black/75 backdrop-blur-md"
+            onClick={() => setOpen(false)}
+          />
+
+          {/* centered panel — no overflow scroll */}
+          <div className="relative z-10 flex max-h-[92vh] w-full max-w-[520px] flex-col overflow-hidden rounded-2xl border border-white/20 shadow-[0_24px_80px_rgba(0,0,0,0.55)]">
+            {/* hero-like bg */}
+            <div className="pointer-events-none absolute inset-0" aria-hidden>
+              <div className="hr-aurora-layer hr-aurora-violet absolute inset-0">
+                <div className="hr3-glow absolute inset-0" />
+              </div>
+              <div className="absolute inset-0 opacity-35">
+                <HeroBackgroundSlideshow showDots={false} intervalMs={5000} fadeMs={2200} />
+              </div>
+              <div className="hr3-vignette absolute inset-0" />
+              <div className="absolute inset-0 bg-[#0B0F19]/55" />
+            </div>
+
+            {/* header */}
+            <div className="relative z-10 flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-2.5">
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400/30 to-[#4dabff]/25 ring-1 ring-white/20">
+                  <Bell className="h-4 w-4 text-amber-200" aria-hidden />
+                </span>
+                <div>
+                  <h2 id={titleId} className="text-sm font-extrabold tracking-tight text-white">
+                    맞춤 알림 신청
+                  </h2>
+                  <p className="text-[10px] text-white/45">조건에 맞는 물건이 등록되면 바로 알려 드립니다</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white/80 transition hover:border-white/40 hover:bg-white/20 hover:text-white"
+                aria-label="닫기"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* body — compact, no scroll */}
+            <div className="relative z-10 flex min-h-0 flex-1 flex-col gap-2.5 px-4 py-3">
+              {/* type tabs */}
+              <div className="grid grid-cols-2 gap-1.5 rounded-xl bg-black/35 p-1 ring-1 ring-white/10">
+                <button
+                  type="button"
+                  onClick={() => setAlertType("property")}
+                  className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-extrabold transition ${
+                    alertType === "property"
+                      ? "bg-gradient-to-r from-[#4dabff] to-[#6a7dff] text-white shadow-[0_4px_18px_rgba(77,171,255,0.45)]"
+                      : "text-white/50 hover:bg-white/5 hover:text-white/80"
+                  }`}
+                >
+                  <Building2 className="h-3.5 w-3.5" aria-hidden />
+                  부동산매매
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAlertType("auction")}
+                  className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-extrabold transition ${
+                    alertType === "auction"
+                      ? "bg-gradient-to-r from-amber-400 to-orange-500 text-[#1a1208] shadow-[0_4px_18px_rgba(251,191,36,0.4)]"
+                      : "text-white/50 hover:bg-white/5 hover:text-white/80"
+                  }`}
+                >
+                  <Gavel className="h-3.5 w-3.5" aria-hidden />
+                  경매물건
+                </button>
+              </div>
+
+              {/* channels */}
+              <div>
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-white/40">알림 수단</p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(
+                    [
+                      { id: "EMAIL" as const, label: "메일", Icon: Mail },
+                      { id: "SMS" as const, label: "문자", Icon: Phone },
+                      { id: "KAKAO" as const, label: "카카오톡", Icon: MessageCircle },
+                    ] as const
+                  ).map(({ id, label, Icon }) => {
+                    const on = channels.includes(id);
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => toggleChannel(id)}
+                        className={`relative flex flex-col items-center gap-1 rounded-xl border px-1 py-2 transition ${
+                          on
+                            ? "border-[#4dabff]/60 bg-gradient-to-b from-[#4dabff]/25 to-transparent text-white shadow-[inset_0_0_0_1px_rgba(77,171,255,0.25)]"
+                            : "border-white/10 bg-white/[0.04] text-white/45 hover:border-white/25 hover:text-white/75"
+                        }`}
+                      >
+                        {on ? (
+                          <span className="absolute right-1.5 top-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#4dabff] text-[#0B0F19]">
+                            <Check className="h-2.5 w-2.5" strokeWidth={3} aria-hidden />
+                          </span>
+                        ) : null}
+                        <Icon className="h-4 w-4" aria-hidden />
+                        <span className="text-[11px] font-bold">{label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* contact */}
+              <div className="grid grid-cols-2 gap-1.5">
+                <label className="block text-[10px] font-bold text-white/45">
+                  이름
+                  <input
+                    className="mt-1 w-full rounded-lg border border-white/15 bg-black/40 px-2.5 py-1.5 text-xs text-white placeholder:text-white/30 focus:border-[#4dabff] focus:outline-none"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="선택"
+                  />
+                </label>
+                {needEmail ? (
+                  <label className="block text-[10px] font-bold text-white/45">
+                    이메일
+                    <input
+                      type="email"
+                      className="mt-1 w-full rounded-lg border border-white/15 bg-black/40 px-2.5 py-1.5 text-xs text-white placeholder:text-white/30 focus:border-[#4dabff] focus:outline-none"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@mail.com"
+                    />
+                  </label>
+                ) : (
+                  <label className="block text-[10px] font-bold text-white/45">
+                    휴대폰
+                    <input
+                      type="tel"
+                      className="mt-1 w-full rounded-lg border border-white/15 bg-black/40 px-2.5 py-1.5 text-xs text-white placeholder:text-white/30 focus:border-[#4dabff] focus:outline-none"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="010-0000-0000"
+                    />
+                  </label>
+                )}
+                {needEmail && needPhone ? (
+                  <label className="col-span-2 block text-[10px] font-bold text-white/45">
+                    휴대폰
+                    <input
+                      type="tel"
+                      className="mt-1 w-full rounded-lg border border-white/15 bg-black/40 px-2.5 py-1.5 text-xs text-white placeholder:text-white/30 focus:border-[#4dabff] focus:outline-none"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="010-0000-0000"
+                    />
+                  </label>
+                ) : null}
+              </div>
+
+              {/* regions */}
+              <div>
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-white/40">관심 지역</p>
+                <div className="flex flex-wrap gap-1">
+                  {REGIONS.map((r) => {
+                    const on = regions.includes(r);
+                    return (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => setRegions(toggleInList(regions, r))}
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-bold transition ${
+                          on
+                            ? "bg-white text-[#0B0F19] shadow-[0_0_12px_rgba(255,255,255,0.25)]"
+                            : "bg-white/10 text-white/55 ring-1 ring-white/10 hover:bg-white/15 hover:text-white"
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {alertType === "property" ? (
+                <>
+                  <div>
+                    <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-white/40">매물 유형</p>
+                    <div className="flex flex-wrap gap-1">
+                      {PROPERTY_CATEGORIES.map((c) => {
+                        const on = categories.includes(c.value);
+                        return (
+                          <button
+                            key={c.value}
+                            type="button"
+                            onClick={() => setCategories(toggleInList(categories, c.value))}
+                            className={`rounded-lg px-2 py-1 text-[11px] font-bold transition ${
+                              on
+                                ? "bg-gradient-to-r from-[#4dabff]/90 to-[#913dff]/80 text-white"
+                                : "bg-white/8 text-white/50 ring-1 ring-white/10 hover:text-white"
+                            }`}
+                          >
+                            {c.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-white/40">거래 유형</p>
+                    <div className="flex flex-wrap gap-1">
+                      {DEAL_OPTIONS.map((d) => {
+                        const on = deals.includes(d.value);
+                        return (
+                          <button
+                            key={d.value}
+                            type="button"
+                            onClick={() => setDeals(toggleInList(deals, d.value))}
+                            className={`rounded-lg px-3 py-1 text-[11px] font-bold transition ${
+                              on
+                                ? "bg-gradient-to-r from-cyan-400 to-[#4dabff] text-[#061018]"
+                                : "bg-white/8 text-white/50 ring-1 ring-white/10 hover:text-white"
+                            }`}
+                          >
+                            {d.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-white/40">경매 유형</p>
+                    <div className="flex flex-wrap gap-1">
+                      {AUCTION_TYPES.map((t) => {
+                        const on = auctionTypes.includes(t);
+                        return (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => setAuctionTypes(toggleInList(auctionTypes, t))}
+                            className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${
+                              on
+                                ? "bg-gradient-to-r from-amber-400 to-orange-500 text-[#1a1208]"
+                                : "bg-white/8 text-white/50 ring-1 ring-white/10 hover:text-white"
+                            }`}
+                          >
+                            {t}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <label className="block text-[10px] font-bold text-white/45">
+                      감정가 최소(만원)
+                      <input
+                        className="mt-1 w-full rounded-lg border border-white/15 bg-black/40 px-2.5 py-1.5 text-xs text-white placeholder:text-white/30 focus:border-amber-400 focus:outline-none"
+                        inputMode="numeric"
+                        value={appraisalMin}
+                        onChange={(e) => setAppraisalMin(e.target.value)}
+                        placeholder="10000"
+                      />
+                    </label>
+                    <label className="block text-[10px] font-bold text-white/45">
+                      감정가 최대(만원)
+                      <input
+                        className="mt-1 w-full rounded-lg border border-white/15 bg-black/40 px-2.5 py-1.5 text-xs text-white placeholder:text-white/30 focus:border-amber-400 focus:outline-none"
+                        inputMode="numeric"
+                        value={appraisalMax}
+                        onChange={(e) => setAppraisalMax(e.target.value)}
+                        placeholder="50000"
+                      />
+                    </label>
+                  </div>
+                </>
+              )}
+
+              <div className="mt-auto space-y-2 pt-1">
+                <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-white/10 bg-black/30 px-2.5 py-2">
+                  <input
+                    type="checkbox"
+                    checked={agreed}
+                    onChange={(e) => setAgreed(e.target.checked)}
+                    className="mt-0.5 h-3.5 w-3.5 rounded border-white/30 bg-black/40 text-[#4dabff]"
+                  />
+                  <span className="text-[10px] leading-snug text-white/60">
+                    개인정보(연락처·관심조건) 수집·이용에 동의합니다. 승인 후 조건 매칭 시 즉시 안내됩니다.
+                  </span>
+                </label>
+
+                {msg ? (
+                  <p
+                    className={`text-center text-[11px] font-medium ${
+                      msg.includes("접수") ? "text-emerald-300" : "text-amber-200"
+                    }`}
+                  >
+                    {msg}
+                  </p>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={submit}
+                  className="group relative w-full overflow-hidden rounded-xl py-3 text-sm font-extrabold text-white"
+                >
+                  <span className="absolute inset-0 bg-gradient-to-r from-amber-400 via-[#4dabff] to-[#913dff]" />
+                  <span className="absolute inset-0 opacity-0 transition group-hover:opacity-100 bg-gradient-to-r from-[#913dff] via-[#4dabff] to-amber-400" />
+                  <span className="relative flex items-center justify-center gap-2 drop-shadow">
+                    <Sparkles className="h-4 w-4" aria-hidden />
+                    신청하기
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}

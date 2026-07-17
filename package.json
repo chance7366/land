@@ -1,0 +1,56 @@
+{
+  "name": "chance-auction",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node ./node_modules/next/dist/bin/next dev",
+    "build": "node ./node_modules/next/dist/bin/next build",
+    "start": "node ./node_modules/next/dist/bin/next start",
+    "lint": "node ./node_modules/eslint/bin/eslint.js .",
+    "sync": "powershell -ExecutionPolicy Bypass -File ./scripts/sync-dev.ps1",
+    "serve:stable": "powershell -ExecutionPolicy Bypass -File ./scripts/serve-stable.ps1",
+    "db:generate": "node ./node_modules/prisma/build/index.js generate",
+    "db:push": "node ./node_modules/prisma/build/index.js db push",
+    "db:seed": "node ./node_modules/tsx/dist/cli.mjs prisma/seed.ts",
+    "db:studio": "node ./node_modules/prisma/build/index.js studio",
+    "collect:news": "node ./node_modules/tsx/dist/cli.mjs scripts/collect-news-feed.ts",
+    "collect:news:cron": "node ./node_modules/tsx/dist/cli.mjs scripts/news-feed-scheduler.ts",
+    "collect:news:task": "powershell -ExecutionPolicy Bypass -File ./scripts/run-news-feed-collect.ps1",
+    "collect:news:register": "powershell -ExecutionPolicy Bypass -File ./scripts/register-news-feed-tasks.ps1"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.9.0",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.6.1",
+    "@supabase/ssr": "^0.12.3",
+    "@supabase/supabase-js": "^2.110.7",
+    "cheerio": "^1.2.0",
+    "lucide-react": "^1.24.0",
+    "next": "^15.3.4",
+    "node-cron": "^4.6.0",
+    "nodemailer": "^9.0.3",
+    "playwright": "^1.61.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "@tailwindcss/postcss": "^4.1.10",
+    "@types/node": "^22.15.32",
+    "@types/node-cron": "^3.0.11",
+    "@types/nodemailer": "^8.0.1",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@types/three": "^0.185.1",
+    "eslint": "^9.29.0",
+    "eslint-config-next": "^15.3.4",
+    "prisma": "^6.9.0",
+    "tailwindcss": "^4.1.10",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}

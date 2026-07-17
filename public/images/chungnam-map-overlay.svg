@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" fill="none" aria-hidden="true">
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(77,171,255,0.08)" stroke-width="0.5"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="600" fill="url(#grid)"/>
+  <!-- Simplified Chungnam / Sejong / Daejeon region silhouette -->
+  <path
+    d="M180 420 C220 360 280 340 340 360 C400 380 460 320 520 300 C580 280 640 260 700 280 C760 300 820 260 880 240 C940 220 1000 260 1040 300 C1060 340 1020 400 960 420 C900 440 840 460 780 450 C720 440 660 480 600 490 C540 500 480 480 420 470 C360 460 300 480 240 470 C200 460 160 450 180 420 Z"
+    stroke="rgba(145,61,255,0.22)"
+    stroke-width="1.5"
+    fill="rgba(77,171,255,0.06)"
+  />
+  <circle cx="620" cy="380" r="6" fill="rgba(77,171,255,0.35)"/>
+  <circle cx="720" cy="340" r="5" fill="rgba(145,61,255,0.35)"/>
+  <circle cx="540" cy="400" r="5" fill="rgba(212,191,255,0.3)"/>
+  <circle cx="820" cy="320" r="4" fill="rgba(77,171,255,0.25)"/>
+  <path d="M620 380 L720 340 M620 380 L540 400 M720 340 L820 320" stroke="rgba(77,171,255,0.12)" stroke-width="1" stroke-dasharray="4 6"/>
+</svg>

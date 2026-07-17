@@ -1,0 +1,360 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum PropertyType {
+  SALE
+  RENT
+  PRE_SALE
+  SHORT_TERM
+}
+
+enum PropertyCategory {
+  APARTMENT
+  OFFICETEL
+  RETAIL
+  OFFICE
+  ROW_HOUSE
+  MULTI_FAMILY
+  LAND
+  DETACHED
+  ONE_ROOM
+  FACTORY
+}
+
+enum PropertyStatus {
+  ACTIVE
+  SOLD
+  HIDDEN
+}
+
+enum AuctionSafetyGrade {
+  SAFE
+  CAUTION
+  RISK
+}
+
+enum AuctionStatus {
+  ONGOING
+  CLOSED
+  FAILED
+}
+
+enum LegalQuestionStatus {
+  PENDING
+  REVIEWING
+  ANSWERED
+}
+
+enum ConsultationStatus {
+  PENDING
+  PROCESSING
+  DONE
+}
+
+enum ApiIntegrationStatus {
+  ACTIVE
+  WARNING
+  OFF
+}
+
+enum ScrapingJobStatus {
+  RUNNING
+  STOPPED
+  ERROR
+}
+
+enum SuccessStoryStatus {
+  PUBLISHED
+  HIDDEN
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String   @default("관리자")
+  role         String   @default("admin")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Property {
+  id             String           @id @default(cuid())
+  /// 매물_00000001 형식
+  manageCode     String           @unique
+  title          String
+  description    String
+  type           PropertyType
+  category       PropertyCategory @default(APARTMENT)
+  price          Int
+  deposit        Int?
+  monthlyRent    Int?
+  isJeonse       Boolean          @default(false)
+  dealSubType    String?
+  area           String?
+  address        String
+  region         String           @default("내포신도시")
+  sido           String?
+  sigungu        String?
+  eupmyeondong   String?
+  ri             String?
+  jibunMain      String?
+  jibunSub       String?
+  buildingName   String?
+  exclusiveArea  Float?
+  supplyArea     Float?
+  floor          Int?
+  totalFloors    Int?
+  direction      String?
+  builtYear      Int?
+  parking        String?
+  rooms          Int?
+  bathrooms      Int?
+  unitDong       String?
+  unitHo         String?
+  maintenanceFee Int?
+  keyMoney       Int?
+  keyMoneyHidden Boolean          @default(false)
+  vatIncluded    Boolean?
+  businessType   String?
+  landCategory   String?
+  zoning         String?
+  loanStatus     String?
+  moveInType     String?
+  featureSummary String?
+  ownerName      String?
+  ownerRelation  String?
+  ownerPhone     String?
+  clientName     String?
+  naverComplexId String?
+  naverDongId    String?
+  specs          String           @default("{}")
+  tags           String           @default("[]")
+  moveInDate     String?
+  images         String           @default("[]")
+  featured       Boolean          @default(false)
+  status         PropertyStatus   @default(ACTIVE)
+  publishedAt    DateTime         @default(now())
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
+
+model Auction {
+  id                String             @id @default(cuid())
+  /// 경매_00000001 형식
+  manageCode        String             @unique
+  caseNumber        String
+  itemNo            Int                @default(1)
+  title             String
+  description       String
+  // Float: amounts can exceed Int32 (e.g. claimAmount 38억+)
+  appraisalPrice    Float
+  recommendedPrice  Float
+  safetyGrade       AuctionSafetyGrade @default(SAFE)
+  status            AuctionStatus      @default(ONGOING)
+  dDay              Int
+  images            String             @default("[]")
+  reportUrl         String?
+  court             String?
+  saleDate          DateTime?
+  address           String?
+  address2          String?
+  region            String?
+  auctionType       String?
+  itemType          String?
+  auctionTarget     String?
+  bidMethod         String?
+  landArea          Float?
+  buildingArea      Float?
+  minPrice          Float?
+  bidDeposit        Float?
+  claimAmount       Float?
+  debtorOwner       String?
+  creditor          String?
+  attachments       String             @default("[]")
+  rightsAnalysis    String?
+  memo              String?
+  winningPrice      Float?
+  winningRatio      Float?
+  bidderCount       Int?
+  secondBidAmount   Float?
+  featured          Boolean            @default(false)
+  publishedAt       DateTime           @default(now())
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([caseNumber, itemNo])
+}
+
+model News {
+  id          String   @id @default(cuid())
+  title       String
+  summary     String
+  body        String
+  thumbnail   String?
+  featured    Boolean  @default(false)
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/** 출처별 자동 수집 부동산 소식 (원문 링크만 저장) */
+model NewsFeedItem {
+  id         String   @id @default(cuid())
+  source     String
+  sourceName String
+  title      String
+  summary    String   @default("")
+  press      String   @default("")
+  originUrl  String   @unique
+  imageUrl   String?
+  rank       Int?
+  pubDate    DateTime
+  fetchedAt  DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([source, pubDate])
+  @@index([source, rank])
+}
+
+model LegalQuestion {
+  id             String              @id @default(cuid())
+  category       String
+  question       String
+  content        String              @default("")
+  authorName     String              @default("")
+  phone          String?
+  answer         String?
+  answerer       String?
+  status         LegalQuestionStatus @default(PENDING)
+  isPublic       Boolean             @default(true)
+  isSecret       Boolean             @default(false)
+  accessCode     String              @default("")
+  suggestConsult Boolean             @default(false)
+  createdAt      DateTime            @default(now())
+  answeredAt     DateTime?
+  updatedAt      DateTime            @updatedAt
+}
+
+model Consultation {
+  id           String             @id @default(cuid())
+  clientName   String
+  phone        String
+  email        String?
+  category     String
+  subCategory  String?
+  summary      String
+  detail       String
+  method       String?
+  preferredAt  String?
+  accessCode   String             @default("")
+  reply        String?
+  repliedAt    DateTime?
+  status       ConsultationStatus @default(PENDING)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([accessCode])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  clientName String
+  content   String
+  rating    Int      @default(5)
+  visible   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SuccessStory {
+  id         String             @id @default(cuid())
+  category   String
+  title      String
+  content    String
+  authorName String             @default("")
+  status     SuccessStoryStatus @default(PUBLISHED)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  @@index([status, createdAt])
+  @@index([category, createdAt])
+}
+
+model ApiIntegration {
+  id          String               @id @default(cuid())
+  name        String
+  provider    String
+  status      ApiIntegrationStatus @default(ACTIVE)
+  config      String               @default("{}")
+  lastSyncAt  DateTime?
+  dailyUsage  Int                  @default(0)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+}
+
+model ScrapingJob {
+  id            String            @id @default(cuid())
+  name          String
+  status        ScrapingJobStatus @default(STOPPED)
+  progress      Int               @default(0)
+  scrapedCount  Int               @default(0)
+  errorCount    Int               @default(0)
+  updatedCount  Int               @default(0)
+  lastRunAt     DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+}
+
+model SystemLog {
+  id        String   @id @default(cuid())
+  level     String
+  event     String
+  message   String
+  createdAt DateTime @default(now())
+}
+
+/** 맞춤 알림 구독자 (중개·경매). 승인 후 매물/경매 등록 시 즉시 알림 */
+model EmailSubscriber {
+  id               String   @id @default(cuid())
+  name             String?
+  email            String?
+  phone            String?
+  subscriptionType String // REAL_ESTATE | AUCTION
+  channels         String   @default("[\"EMAIL\"]") // JSON: EMAIL | SMS | KAKAO
+  preferences      String   @default("{}") // JSON 조건
+  status           String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  isPrivacyAgreed  Boolean  @default(false)
+  unsubscribeToken String   @unique @default(cuid())
+  adminNote        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  notifications NotificationLog[]
+
+  @@index([status, subscriptionType])
+  @@index([email])
+  @@index([phone])
+}
+
+model NotificationLog {
+  id           String   @id @default(cuid())
+  subscriberId String
+  subscriber   EmailSubscriber @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+  entityType   String // PROPERTY | AUCTION
+  entityId     String
+  channel      String // EMAIL | SMS | KAKAO
+  status       String // SENT | FAILED | SKIPPED
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  @@unique([subscriberId, entityType, entityId, channel])
+  @@index([entityType, entityId])
+}
