@@ -1,10 +1,15 @@
 import { AdminConsultationsClient } from "@/components/admin/AdminConsultationsClient";
+import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminConsultationsPage() {
-  const items = await prisma.consultation.findMany({ orderBy: { createdAt: "desc" } });
+  const items = await withDbFallback(
+    "admin-consultations",
+    () => prisma.consultation.findMany({ orderBy: { createdAt: "desc" } }),
+    [],
+  );
 
   // Serialize dates for client component
   const initialItems = items.map((row) => ({

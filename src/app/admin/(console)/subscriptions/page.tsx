@@ -1,4 +1,5 @@
 import { AdminSubscriptionsClient } from "@/components/admin/AdminSubscriptionsClient";
+import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
 import {
   parseChannels,
@@ -12,10 +13,15 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function AdminSubscriptionsPage() {
-  const items = await prisma.emailSubscriber.findMany({
-    orderBy: { createdAt: "desc" },
-    include: { _count: { select: { notifications: true } } },
-  });
+  const items = await withDbFallback(
+    "admin-subscriptions",
+    () =>
+      prisma.emailSubscriber.findMany({
+        orderBy: { createdAt: "desc" },
+        include: { _count: { select: { notifications: true } } },
+      }),
+    [],
+  );
 
   const initialItems = items.map((row) => {
     const type = row.subscriptionType as SubscriptionType;

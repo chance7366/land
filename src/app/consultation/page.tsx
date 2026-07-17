@@ -7,6 +7,7 @@ import { LandingShell } from "@/components/landing/LandingShell";
 import { ConsultationPageClient } from "@/components/consultation/ConsultationPageClient";
 import { ConsultationPageWithQuery } from "@/components/consultation/ConsultationPageWithQuery";
 import { publicCaseId } from "@/lib/consultation";
+import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -17,11 +18,16 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function ConsultationPage() {
-  const recent = await prisma.consultation.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 8,
-    select: { id: true, category: true, status: true, createdAt: true },
-  });
+  const recent = await withDbFallback(
+    "consultation-page",
+    () =>
+      prisma.consultation.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 8,
+        select: { id: true, category: true, status: true, createdAt: true },
+      }),
+    [],
+  );
 
   const boardRows = recent.map((row) => ({
     caseId: publicCaseId(row.id, row.createdAt),

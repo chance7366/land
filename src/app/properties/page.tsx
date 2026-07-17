@@ -12,7 +12,9 @@ import {
 } from "@/components/property/split/PropertySplitBoard";
 import { getProperties, getPropertyCategoryCounts } from "@/lib/property-service";
 import { parsePropertyListFilters } from "@/lib/property-fields";
+import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
+import type { PropertyCategory } from "@prisma/client";
 
 export const metadata: Metadata = {
   title: "부동산 중개 | 찬스부동산 경매중개",
@@ -45,19 +47,33 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
 
   const openId = typeof params.id === "string" ? params.id : null;
   const filters = parsePropertyListFilters(urlParams);
-  const [items, counts, regionRows] = await Promise.all([
-    getProperties(filters),
-    getPropertyCategoryCounts(),
-    prisma.property.findMany({
-      where: { status: "ACTIVE", sigungu: { not: null } },
-      select: { sigungu: true },
-      distinct: ["sigungu"],
-      orderBy: { sigungu: "asc" },
-    }),
-  ]);
-  const regions = regionRows
-    .map((r) => r.sigungu?.trim())
-    .filter((v): v is string => Boolean(v));
+  const { items, counts, regions } = await withDbFallback(
+    "properties-page",
+    async () => {
+      const [list, categoryCounts, regionRows] = await Promise.all([
+        getProperties(filters),
+        getPropertyCategoryCounts(),
+        prisma.property.findMany({
+          where: { status: "ACTIVE", sigungu: { not: null } },
+          select: { sigungu: true },
+          distinct: ["sigungu"],
+          orderBy: { sigungu: "asc" },
+        }),
+      ]);
+      return {
+        items: list,
+        counts: categoryCounts,
+        regions: regionRows
+          .map((r) => r.sigungu?.trim())
+          .filter((v): v is string => Boolean(v)),
+      };
+    },
+    {
+      items: [],
+      counts: {} as Record<PropertyCategory, number>,
+      regions: [] as string[],
+    },
+  );
   const totalCount = Object.values(counts).reduce((sum, n) => sum + n, 0);
   const filtered = Boolean(
     filters.categories?.length || filters.deals?.length || filters.regions?.length,

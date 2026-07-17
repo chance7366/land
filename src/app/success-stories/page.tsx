@@ -5,6 +5,7 @@ import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingShell } from "@/components/landing/LandingShell";
 import { SuccessStoryBoardClient } from "@/components/success-stories/SuccessStoryBoardClient";
 import { maskStoryAuthor } from "@/lib/success-story";
+import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -22,11 +23,16 @@ export default async function SuccessStoriesPage({
   searchParams: SearchParams;
 }) {
   const { id: openId } = await searchParams;
-  const rows = await prisma.successStory.findMany({
-    where: { status: "PUBLISHED" },
-    orderBy: { createdAt: "desc" },
-    take: 200,
-  });
+  const rows = await withDbFallback(
+    "success-stories-page",
+    () =>
+      prisma.successStory.findMany({
+        where: { status: "PUBLISHED" },
+        orderBy: { createdAt: "desc" },
+        take: 200,
+      }),
+    [],
+  );
 
   const initialItems = rows.map((row) => ({
     id: row.id,

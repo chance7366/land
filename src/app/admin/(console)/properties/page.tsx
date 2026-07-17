@@ -1,11 +1,12 @@
 import { AppLink as Link } from "@/components/ui/AppLink";
 import { getAllPropertiesAdmin } from "@/lib/property-service";
 import { AdminPropertyList } from "@/components/admin/AdminPropertyList";
+import { withDbFallback } from "@/lib/db-fallback";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPropertiesPage() {
-  const items = await getAllPropertiesAdmin();
+  const items = await withDbFallback("admin-properties", () => getAllPropertiesAdmin(), []);
 
   return (
     <main className="p-10">

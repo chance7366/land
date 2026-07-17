@@ -5,6 +5,7 @@ import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingShell } from "@/components/landing/LandingShell";
 import { QaBoardClient } from "@/components/legal/QaBoardClient";
 import { maskAuthor } from "@/lib/qa";
+import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -18,10 +19,15 @@ type SearchParams = Promise<{ id?: string }>;
 
 export default async function LegalPage({ searchParams }: { searchParams: SearchParams }) {
   const { id: openId } = await searchParams;
-  const rows = await prisma.legalQuestion.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
+  const rows = await withDbFallback(
+    "legal-page",
+    () =>
+      prisma.legalQuestion.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      }),
+    [],
+  );
 
   const initialItems = rows.map((row) => ({
     id: row.id,

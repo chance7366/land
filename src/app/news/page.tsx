@@ -18,6 +18,7 @@ import {
   type NewsFeedGroupId,
   type NewsFeedSourceKey,
 } from "@/lib/news-feed";
+import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -48,75 +49,102 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
   }
 
   const where = newsFeedVisibleWhere(initialSource, new Date(), initialGroup);
-  const [allRows, grouped] = await Promise.all([
-    prisma.newsFeedItem.findMany({
-      where,
-      orderBy:
-        initialSource === "naver" ||
-        initialSource === "molit" ||
-        initialSource === "chungnam" ||
-        initialSource === "hongseong" ||
-        initialSource === "yesan" ||
-        initialSource === "rtech" ||
-        initialSource === "r114"
-          ? [{ rank: "asc" }, { pubDate: "desc" }]
-          : [{ pubDate: "desc" }],
-    }),
-    prisma.newsFeedItem.groupBy({
-      by: ["source"],
-      where: newsFeedVisibleWhere("all"),
-      _count: { _all: true },
-    }),
-  ]);
-
-  const ordered =
-    initialSource === "all"
-      ? sortGroupAllByDateThenRandom(allRows, Date.now())
-      : allRows;
-  const total = ordered.length;
-  const rows = ordered.slice(0, NEWS_FEED_PAGE_SIZE);
-
-  const bySource: Record<string, number> = {};
-  for (const s of NEWS_FEED_SOURCES) bySource[s.key] = 0;
-  for (const g of grouped) bySource[g.source] = g._count._all;
-
-  const counts: Record<string, number> = { all: 0, ...bySource };
-  for (const s of NEWS_FEED_SOURCES) counts.all += bySource[s.key] ?? 0;
-
-  const groupCounts: Record<NewsFeedGroupId, Record<string, number>> = {
+  const emptyBySource: Record<string, number> = {};
+  for (const s of NEWS_FEED_SOURCES) emptyBySource[s.key] = 0;
+  const emptyGroupCounts: Record<NewsFeedGroupId, Record<string, number>> = {
     estate: { all: 0 },
     region: { all: 0 },
   };
   for (const g of NEWS_FEED_SIDEBAR_GROUPS) {
     for (const item of g.items) {
       if (item.key === "all") continue;
-      const n = bySource[item.key] ?? 0;
-      groupCounts[g.id][item.key] = n;
-      groupCounts[g.id].all += n;
+      emptyGroupCounts[g.id][item.key] = 0;
     }
   }
 
-  const initial = {
-    items: rows.map((row) => ({
-      id: row.id,
-      source: row.source,
-      sourceName: row.sourceName,
-      title: row.title,
-      summary: row.summary,
-      press: row.press,
-      originUrl: row.originUrl,
-      imageUrl: row.imageUrl,
-      rank: row.rank,
-      pubDate: formatNewsFeedDate(row.pubDate),
-    })),
-    total,
-    page: 1,
-    pageSize: NEWS_FEED_PAGE_SIZE,
-    totalPages: Math.max(1, Math.ceil(total / NEWS_FEED_PAGE_SIZE)),
-    counts,
-    groupCounts,
-    group: initialGroup,
-  };
+  const initial = await withDbFallback(
+    "news-page",
+    async () => {
+      const [allRows, grouped] = await Promise.all([
+        prisma.newsFeedItem.findMany({
+          where,
+          orderBy:
+            initialSource === "naver" ||
+            initialSource === "molit" ||
+            initialSource === "chungnam" ||
+            initialSource === "hongseong" ||
+            initialSource === "yesan" ||
+            initialSource === "rtech" ||
+            initialSource === "r114"
+              ? [{ rank: "asc" }, { pubDate: "desc" }]
+              : [{ pubDate: "desc" }],
+        }),
+        prisma.newsFeedItem.groupBy({
+          by: ["source"],
+          where: newsFeedVisibleWhere("all"),
+          _count: { _all: true },
+        }),
+      ]);
+
+      const ordered =
+        initialSource === "all"
+          ? sortGroupAllByDateThenRandom(allRows, Date.now())
+          : allRows;
+      const total = ordered.length;
+      const rows = ordered.slice(0, NEWS_FEED_PAGE_SIZE);
+
+      const bySource: Record<string, number> = { ...emptyBySource };
+      for (const g of grouped) bySource[g.source] = g._count._all;
+
+      const counts: Record<string, number> = { all: 0, ...bySource };
+      for (const s of NEWS_FEED_SOURCES) counts.all += bySource[s.key] ?? 0;
+
+      const groupCounts: Record<NewsFeedGroupId, Record<string, number>> = {
+        estate: { all: 0 },
+        region: { all: 0 },
+      };
+      for (const g of NEWS_FEED_SIDEBAR_GROUPS) {
+        for (const item of g.items) {
+          if (item.key === "all") continue;
+          const n = bySource[item.key] ?? 0;
+          groupCounts[g.id][item.key] = n;
+          groupCounts[g.id].all += n;
+        }
+      }
+
+      return {
+        items: rows.map((row) => ({
+          id: row.id,
+          source: row.source,
+          sourceName: row.sourceName,
+          title: row.title,
+          summary: row.summary,
+          press: row.press,
+          originUrl: row.originUrl,
+          imageUrl: row.imageUrl,
+          rank: row.rank,
+          pubDate: formatNewsFeedDate(row.pubDate),
+        })),
+        total,
+        page: 1,
+        pageSize: NEWS_FEED_PAGE_SIZE,
+        totalPages: Math.max(1, Math.ceil(total / NEWS_FEED_PAGE_SIZE)),
+        counts,
+        groupCounts,
+        group: initialGroup,
+      };
+    },
+    {
+      items: [],
+      total: 0,
+      page: 1,
+      pageSize: NEWS_FEED_PAGE_SIZE,
+      totalPages: 1,
+      counts: { all: 0, ...emptyBySource },
+      groupCounts: emptyGroupCounts,
+      group: initialGroup,
+    },
+  );
 
   return (
     <LandingShell>

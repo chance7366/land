@@ -1,11 +1,12 @@
 import { AppLink as Link } from "@/components/ui/AppLink";
 import { getAllAuctionsAdmin } from "@/lib/auction-service";
 import { AdminAuctionList } from "@/components/admin/AdminAuctionList";
+import { withDbFallback } from "@/lib/db-fallback";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminAuctionsPage() {
-  const items = await getAllAuctionsAdmin();
+  const items = await withDbFallback("admin-auctions", () => getAllAuctionsAdmin(), []);
 
   return (
     <main className="p-10">

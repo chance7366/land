@@ -7,6 +7,7 @@ import { LandingShell } from "@/components/landing/LandingShell";
 import { UserBottomNav } from "@/components/user/UserShell";
 import { AuctionSplitBoard } from "@/components/auction/split/AuctionSplitBoard";
 import { serializeAuction } from "@/lib/auction-split-view";
+import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -24,10 +25,15 @@ export default async function AuctionsPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const openId = typeof params.id === "string" ? params.id : null;
 
-  const items = await prisma.auction.findMany({
-    where: { status: "ONGOING" },
-    orderBy: [{ featured: "desc" }, { dDay: "asc" }],
-  });
+  const items = await withDbFallback(
+    "auctions-page",
+    () =>
+      prisma.auction.findMany({
+        where: { status: "ONGOING" },
+        orderBy: [{ featured: "desc" }, { dDay: "asc" }],
+      }),
+    [],
+  );
 
   return (
     <LandingShell>

@@ -161,43 +161,60 @@ export async function getHomeDashboardData() {
 }
 
 export async function getAdminDashboardData() {
-  const [
-    visitorCount,
-    consultationPending,
-    activeAuctions,
-    apiIntegrations,
-    scrapingJob,
-    consultations,
-    systemLogs,
-  ] = await Promise.all([
-    Promise.resolve(1284),
-    prisma.consultation.count({
-      where: { status: { in: ["PENDING", "PROCESSING"] } },
-    }),
-    prisma.auction.count({ where: { status: "ONGOING" } }),
-    prisma.apiIntegration.findMany({ orderBy: { name: "asc" } }),
-    prisma.scrapingJob.findFirst({ orderBy: { updatedAt: "desc" } }),
-    prisma.consultation.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 10,
-    }),
-    prisma.systemLog.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 5,
-    }),
-  ]);
-
-  return {
-    stats: {
-      visitors: visitorCount,
-      visitorGrowth: 12,
-      newInquiries: consultationPending,
+  try {
+    const [
+      visitorCount,
+      consultationPending,
       activeAuctions,
-      apiSuccessRate: 99.8,
-    },
-    apiIntegrations,
-    scrapingJob,
-    consultations,
-    systemLogs,
-  };
+      apiIntegrations,
+      scrapingJob,
+      consultations,
+      systemLogs,
+    ] = await Promise.all([
+      Promise.resolve(1284),
+      prisma.consultation.count({
+        where: { status: { in: ["PENDING", "PROCESSING"] } },
+      }),
+      prisma.auction.count({ where: { status: "ONGOING" } }),
+      prisma.apiIntegration.findMany({ orderBy: { name: "asc" } }),
+      prisma.scrapingJob.findFirst({ orderBy: { updatedAt: "desc" } }),
+      prisma.consultation.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 10,
+      }),
+      prisma.systemLog.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      }),
+    ]);
+
+    return {
+      stats: {
+        visitors: visitorCount,
+        visitorGrowth: 12,
+        newInquiries: consultationPending,
+        activeAuctions,
+        apiSuccessRate: 99.8,
+      },
+      apiIntegrations,
+      scrapingJob,
+      consultations,
+      systemLogs,
+    };
+  } catch (error) {
+    console.error("[getAdminDashboardData] falling back to empty data", error);
+    return {
+      stats: {
+        visitors: 0,
+        visitorGrowth: 0,
+        newInquiries: 0,
+        activeAuctions: 0,
+        apiSuccessRate: 0,
+      },
+      apiIntegrations: [],
+      scrapingJob: null,
+      consultations: [],
+      systemLogs: [],
+    };
+  }
 }
