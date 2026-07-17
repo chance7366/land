@@ -1,8 +1,26 @@
+import { createClient } from "@supabase/supabase-js";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+
+/** 홈 조회용 — service role 우선, 없으면 anon(공개 RLS) */
+function createLandingClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  const service = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+
+  if (url && service) {
+    return createSupabaseAdminClient();
+  }
+  if (url && anon) {
+    return createClient(url, anon, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+  throw new Error("Supabase URL/키가 설정되지 않았습니다.");
+}
 
 /** 홈 히어로 하단 — Supabase 조회 */
 export async function getLandingHomeDataFromSupabase() {
-  const sb = createSupabaseAdminClient();
+  const sb = createLandingClient();
 
   const [
     { data: properties, error: pErr },
@@ -38,10 +56,10 @@ export async function getLandingHomeDataFromSupabase() {
       .limit(5),
   ]);
 
-  if (pErr) throw pErr;
-  if (aErr) throw aErr;
-  if (lErr) throw lErr;
-  if (sErr) throw sErr;
+  if (pErr) console.error("[landing] properties", pErr.message);
+  if (aErr) console.error("[landing] auctions", aErr.message);
+  if (lErr) console.error("[landing] legal_questions", lErr.message);
+  if (sErr) console.error("[landing] success_stories", sErr.message);
 
   return {
     properties: (properties ?? []).map(mapPropertyRow),

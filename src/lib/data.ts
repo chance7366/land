@@ -33,6 +33,20 @@ export async function getLandingFeaturedData() {
   };
 }
 
+const emptyLandingHomeData = (): {
+  properties: Property[];
+  auctions: Auction[];
+  newsFeed: NewsFeedItem[];
+  legalQuestions: LegalQuestion[];
+  successStories: SuccessStory[];
+} => ({
+  properties: [],
+  auctions: [],
+  newsFeed: [],
+  legalQuestions: [],
+  successStories: [],
+});
+
 /** 홈 히어로 하단 멀티 섹션용 */
 export async function getLandingHomeData(): Promise<{
   properties: Property[];
@@ -41,61 +55,67 @@ export async function getLandingHomeData(): Promise<{
   legalQuestions: LegalQuestion[];
   successStories: SuccessStory[];
 }> {
-  if (isSupabaseEnabled()) {
-    const data = await getLandingHomeDataFromSupabase();
+  try {
+    if (isSupabaseEnabled()) {
+      const data = await getLandingHomeDataFromSupabase();
+      return {
+        properties: data.properties as unknown as Property[],
+        auctions: data.auctions as unknown as Auction[],
+        newsFeed: data.newsFeed as unknown as NewsFeedItem[],
+        legalQuestions: data.legalQuestions as unknown as LegalQuestion[],
+        successStories: data.successStories as unknown as SuccessStory[],
+      };
+    }
+
+    const now = new Date();
+    const [properties, auctions, estateNews, regionNews, legalQuestions, successStories] =
+      await Promise.all([
+        prisma.property.findMany({
+          where: { status: "ACTIVE" },
+          orderBy: [{ featured: "desc" }, { publishedAt: "desc" }],
+          take: 12,
+        }),
+        prisma.auction.findMany({
+          where: { status: "ONGOING" },
+          orderBy: [{ featured: "desc" }, { dDay: "asc" }],
+          take: 12,
+        }),
+        /** 부동산소식 전체보기 상위 3건 */
+        prisma.newsFeedItem.findMany({
+          where: newsFeedVisibleWhere("all", now, "estate"),
+          orderBy: { pubDate: "desc" },
+          take: 3,
+        }),
+        /** 지역소식 전체보기 상위 2건 */
+        prisma.newsFeedItem.findMany({
+          where: newsFeedVisibleWhere("all", now, "region"),
+          orderBy: { pubDate: "desc" },
+          take: 2,
+        }),
+        prisma.legalQuestion.findMany({
+          where: { isPublic: true },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+        }),
+        prisma.successStory.findMany({
+          where: { status: "PUBLISHED" },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+        }),
+      ]);
+
     return {
-      properties: data.properties as unknown as Property[],
-      auctions: data.auctions as unknown as Auction[],
-      newsFeed: data.newsFeed as unknown as NewsFeedItem[],
-      legalQuestions: data.legalQuestions as unknown as LegalQuestion[],
-      successStories: data.successStories as unknown as SuccessStory[],
+      properties,
+      auctions,
+      newsFeed: [...estateNews, ...regionNews],
+      legalQuestions,
+      successStories,
     };
+  } catch (error) {
+    // Vercel 등에서 SQLite가 없거나 Supabase 미설정 시에도 홈은 렌더되게 함
+    console.error("[getLandingHomeData] falling back to empty data", error);
+    return emptyLandingHomeData();
   }
-
-  const now = new Date();
-  const [properties, auctions, estateNews, regionNews, legalQuestions, successStories] =
-    await Promise.all([
-      prisma.property.findMany({
-        where: { status: "ACTIVE" },
-        orderBy: [{ featured: "desc" }, { publishedAt: "desc" }],
-        take: 12,
-      }),
-      prisma.auction.findMany({
-        where: { status: "ONGOING" },
-        orderBy: [{ featured: "desc" }, { dDay: "asc" }],
-        take: 12,
-      }),
-      /** 부동산소식 전체보기 상위 3건 */
-      prisma.newsFeedItem.findMany({
-        where: newsFeedVisibleWhere("all", now, "estate"),
-        orderBy: { pubDate: "desc" },
-        take: 3,
-      }),
-      /** 지역소식 전체보기 상위 2건 */
-      prisma.newsFeedItem.findMany({
-        where: newsFeedVisibleWhere("all", now, "region"),
-        orderBy: { pubDate: "desc" },
-        take: 2,
-      }),
-      prisma.legalQuestion.findMany({
-        where: { isPublic: true },
-        orderBy: { createdAt: "desc" },
-        take: 5,
-      }),
-      prisma.successStory.findMany({
-        where: { status: "PUBLISHED" },
-        orderBy: { createdAt: "desc" },
-        take: 5,
-      }),
-    ]);
-
-  return {
-    properties,
-    auctions,
-    newsFeed: [...estateNews, ...regionNews],
-    legalQuestions,
-    successStories,
-  };
 }
 
 export async function getHomeDashboardData() {

@@ -152,6 +152,12 @@ Vercel 프로젝트 → **Settings** → **Environment Variables**
 
 **빌드 실패(`/admin` prerender) 주의:** 관리자·DB 페이지는 `force-dynamic`이며, Vercel에는 위 환경변수를 넣은 뒤 Redeploy 하세요. `DATABASE_URL`이 없으면 `prisma generate`가 실패할 수 있습니다.
 
+**런타임 `Application error` 주의:** 로컬 SQLite는 Vercel에서 동작하지 않습니다. 홈은 DB 실패 시 빈 데이터로라도 렌더되지만, 매물·상담 등 실제 데이터는 아래를 반드시 설정하세요.
+
+1. Supabase SQL (`001_init_chance.sql`) 실행  
+2. Vercel Environment Variables에 `DATA_PROVIDER=supabase` + Supabase URL/anon/(가능하면) service_role  
+3. **Redeploy** (환경변수는 재배포 후에야 적용됩니다)
+
 저장 후 **Deployments → Redeploy** 하여 환경변수를 반영하세요.
 
 ### 4-3. 자동 배포 흐름
