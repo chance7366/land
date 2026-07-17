@@ -1,5 +1,6 @@
 import { AppLink as Link } from "@/components/ui/AppLink";
 import { notFound } from "next/navigation";
+import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
 import { AuctionForm } from "@/components/admin/AuctionForm";
 
@@ -7,7 +8,11 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminAuctionEditPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const auction = await prisma.auction.findUnique({ where: { id } });
+  const auction = await withDbFallback(
+    "admin-auction-edit",
+    () => prisma.auction.findUnique({ where: { id } }),
+    null,
+  );
   if (!auction) notFound();
 
   return (

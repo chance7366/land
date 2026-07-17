@@ -1,5 +1,6 @@
 import { AppLink as Link } from "@/components/ui/AppLink";
 import { notFound } from "next/navigation";
+import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
 import { PropertyForm } from "@/components/admin/PropertyForm";
 
@@ -7,7 +8,11 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminPropertyEditPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const property = await prisma.property.findUnique({ where: { id } });
+  const property = await withDbFallback(
+    "admin-property-edit",
+    () => prisma.property.findUnique({ where: { id } }),
+    null,
+  );
   if (!property) notFound();
 
   return (
