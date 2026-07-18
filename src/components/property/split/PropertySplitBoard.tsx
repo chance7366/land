@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import type { Property } from "@prisma/client";
 import { Search } from "lucide-react";
 import { AppLink as Link } from "@/components/ui/AppLink";
+import { ItemDwellTracker } from "@/components/analytics/ItemDwellTracker";
 import { PropertySplitDetail } from "@/components/property/split/PropertySplitDetail";
 import { PropertySplitList } from "@/components/property/split/PropertySplitList";
+import { trackBrowserEvent } from "@/lib/analytics/track";
 
 const panelClass =
   "rounded-2xl border border-white/10 bg-[rgba(20,18,28,0.78)] shadow-[0_8px_32px_rgba(0,0,0,0.35)] backdrop-blur-md";
@@ -80,6 +82,12 @@ export function PropertySplitBoard({ items, initialId = null, totalCount, filter
   function selectProperty(id: string) {
     setSelectedId(id);
     setMobileDetail(true);
+    trackBrowserEvent({
+      eventType: "item_click",
+      menuKey: "properties",
+      targetType: "property",
+      targetId: id,
+    });
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
       url.searchParams.set("id", id);
@@ -87,8 +95,22 @@ export function PropertySplitBoard({ items, initialId = null, totalCount, filter
     }
   }
 
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) return;
+    const t = window.setTimeout(() => {
+      trackBrowserEvent({
+        eventType: "search",
+        menuKey: "properties",
+        metadata: { keyword: q, resultCount: visible.length },
+      });
+    }, 600);
+    return () => window.clearTimeout(t);
+  }, [query, visible.length]);
+
   return (
     <div>
+      <ItemDwellTracker targetType="property" targetId={selectedId} menuKey="properties" />
       <header className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-xl font-extrabold text-white md:text-2xl">

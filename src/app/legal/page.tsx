@@ -10,6 +10,7 @@ import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
 import { isSupabaseEnabled } from "@/lib/supabase/config";
 import { listLegalQuestionsFromSupabase } from "@/lib/supabase/repos/catalog";
+import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 
 export const metadata: Metadata = {
   title: "찬스상담소 | 찬스부동산 경매중개",
@@ -47,6 +48,7 @@ export default async function LegalPage({ searchParams }: { searchParams: Search
 
   return (
     <LandingShell>
+      <AnalyticsPageView menuKey="legal" />
       <LandingHeader />
       <LandingNav />
       <div className="relative min-h-[70vh] overflow-hidden pb-24">

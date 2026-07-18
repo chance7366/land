@@ -6,6 +6,7 @@ import { LandingShell } from "@/components/landing/LandingShell";
 import { LocationPage } from "@/components/location/LocationPage";
 import { UserBottomNav } from "@/components/user/UserShell";
 import { LOCATION_INFO } from "@/lib/location";
+import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 
 export const metadata: Metadata = {
   title: "찾아오시는 길 | 찬스부동산 경매중개",
@@ -15,6 +16,7 @@ export const metadata: Metadata = {
 export default function LocationRoutePage() {
   return (
     <LandingShell>
+      <AnalyticsPageView menuKey="location" />
       <LandingHeader />
       <LandingNav />
       <div className="relative min-h-[70vh] overflow-hidden pb-24">

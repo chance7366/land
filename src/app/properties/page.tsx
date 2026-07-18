@@ -21,6 +21,7 @@ import {
   listPropertyRegionsFromSupabase,
 } from "@/lib/supabase/repos/catalog";
 import type { PropertyCategory } from "@prisma/client";
+import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 
 export const metadata: Metadata = {
   title: "부동산 중개 | 찬스부동산 경매중개",
@@ -99,6 +100,7 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
 
   return (
     <LandingShell>
+      <AnalyticsPageView menuKey="properties" />
       <LandingHeader />
       <LandingNav />
       <div className="relative min-h-[70vh] overflow-hidden pb-24">

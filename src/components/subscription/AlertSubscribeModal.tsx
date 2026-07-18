@@ -23,6 +23,7 @@ import {
   type NotifyChannel,
   type SubscriptionType,
 } from "@/lib/subscription";
+import { trackBrowserEvent } from "@/lib/analytics/track";
 
 function toggleInList(list: string[], value: string) {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
@@ -128,6 +129,11 @@ export function AlertSubscribeModal({ open, onClose, defaultType = null }: Alert
         return;
       }
       setOkMessage(data.message ?? "신청이 접수되었습니다.");
+      trackBrowserEvent({
+        eventType: "cta_click",
+        menuKey: "home",
+        metadata: { action: "alert_subscribe", subscriptionType: alertType },
+      });
       setTimeout(() => onClose(), 1400);
     } catch {
       setMessage("네트워크 오류가 발생했습니다.");

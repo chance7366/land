@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
+import { ItemDwellTracker } from "@/components/analytics/ItemDwellTracker";
 import type { SerializedAuction } from "@/lib/auction-split-view";
+import { trackBrowserEvent } from "@/lib/analytics/track";
 import { AuctionSplitDetail } from "./AuctionSplitDetail";
 import { AuctionSplitList } from "./AuctionSplitList";
 
@@ -68,6 +70,12 @@ export function AuctionSplitBoard({ items, initialId = null, totalCount }: Props
   function selectAuction(id: string) {
     setSelectedId(id);
     setMobileDetail(true);
+    trackBrowserEvent({
+      eventType: "item_click",
+      menuKey: "auctions",
+      targetType: "auction",
+      targetId: id,
+    });
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
       url.searchParams.set("id", id);
@@ -75,8 +83,22 @@ export function AuctionSplitBoard({ items, initialId = null, totalCount }: Props
     }
   }
 
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) return;
+    const t = window.setTimeout(() => {
+      trackBrowserEvent({
+        eventType: "search",
+        menuKey: "auctions",
+        metadata: { keyword: q, resultCount: visible.length },
+      });
+    }, 600);
+    return () => window.clearTimeout(t);
+  }, [query, visible.length]);
+
   return (
     <div>
+      <ItemDwellTracker targetType="auction" targetId={selectedId} menuKey="auctions" />
       <header className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-xl font-extrabold text-white md:text-2xl">

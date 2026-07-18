@@ -6,6 +6,7 @@ import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingShell } from "@/components/landing/LandingShell";
 import { ConsultationPageClient } from "@/components/consultation/ConsultationPageClient";
 import { ConsultationPageWithQuery } from "@/components/consultation/ConsultationPageWithQuery";
+import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 import { publicCaseId } from "@/lib/consultation";
 import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
@@ -38,6 +39,7 @@ export default async function ConsultationPage() {
 
   return (
     <LandingShell>
+      <AnalyticsPageView menuKey="consultation" />
       <LandingHeader />
       <LandingNav />
       <div className="relative min-h-[70vh] overflow-hidden">

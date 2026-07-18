@@ -5,6 +5,7 @@ import { LandingHeader } from "@/components/landing/LandingHeader";
 import { LandingHero } from "@/components/landing/LandingHero";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingShell } from "@/components/landing/LandingShell";
+import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 
 export { dynamic } from "@/lib/page-config";
 
@@ -13,6 +14,7 @@ export default async function HomePage() {
 
   return (
     <LandingShell>
+      <AnalyticsPageView menuKey="home" />
       <LandingHeader />
       <LandingNav />
       <main>

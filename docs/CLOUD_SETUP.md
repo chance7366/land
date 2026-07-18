@@ -47,7 +47,9 @@ npm install @supabase/supabase-js @supabase/ssr
 2. **SQL Editor** → New query
 3. 파일 내용 전체 붙여넣기 후 Run:  
    [`supabase/migrations/001_init_chance.sql`](../supabase/migrations/001_init_chance.sql)  
-   [`supabase/migrations/002_news_feed.sql`](../supabase/migrations/002_news_feed.sql)
+   [`supabase/migrations/002_news_feed.sql`](../supabase/migrations/002_news_feed.sql)  
+   [`supabase/migrations/003_page_events.sql`](../supabase/migrations/003_page_events.sql) (관리자 대시보드 행동 로그)  
+   [`supabase/migrations/004_customer_crm.sql`](../supabase/migrations/004_customer_crm.sql) (고객관리 CRM)
 
 포함 테이블:
 - `properties` — 매물 (images jsonb)
@@ -56,7 +58,8 @@ npm install @supabase/supabase-js @supabase/ssr
 - `legal_questions` — 찬스상담소 Q&A
 - `success_stories` — 성공스토리
 - `subscribers` — 알림 신청자
-- `news_feed_items` — 뉴스 피드  
+- `news_feed_items` — 뉴스 피드
+- `customer_cards` / `customer_interactions` — 고객관리 CRM  
 Storage 버킷: **`property-images`** (public)
 
 ### 2-4. 앱에서 Supabase 사용 켜기

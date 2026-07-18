@@ -14,10 +14,12 @@ import {
   Search,
   Star,
   User,
+  Users,
 } from "lucide-react";
 
 const NAV = [
   { href: "/admin", label: "대시보드", Icon: LayoutDashboard },
+  { href: "/admin/customers", label: "고객 관리", Icon: Users },
   { href: "/admin/properties", label: "매물 관리", Icon: Search },
   { href: "/admin/auctions", label: "경매 관리", Icon: Gavel },
   { href: "/admin/news", label: "부동산 소식", Icon: Newspaper },

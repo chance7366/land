@@ -10,6 +10,7 @@ import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
 import { isSupabaseEnabled } from "@/lib/supabase/config";
 import { listSuccessStoriesFromSupabase } from "@/lib/supabase/repos/catalog";
+import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 
 export const metadata: Metadata = {
   title: "성공스토리 | 찬스부동산 경매중개",
@@ -50,6 +51,7 @@ export default async function SuccessStoriesPage({
 
   return (
     <LandingShell>
+      <AnalyticsPageView menuKey="success_stories" />
       <LandingHeader />
       <LandingNav />
       <div className="relative min-h-[70vh] overflow-hidden pb-24">

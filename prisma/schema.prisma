@@ -358,3 +358,66 @@ model NotificationLog {
   @@unique([subscriberId, entityType, entityId, channel])
   @@index([entityType, entityId])
 }
+
+/** 사용자 행동 로그 (대시보드 분석) — Supabase page_events 와 대응 */
+model PageEvent {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+  eventType  String
+  path       String   @default("")
+  menuKey    String?
+  targetType String?
+  targetId   String?
+  metadata   String   @default("{}")
+
+  @@index([eventType, createdAt])
+  @@index([menuKey, createdAt])
+  @@index([targetType, targetId])
+}
+
+/** 개업공인중개사 고객관리카드 (독립 CRM) */
+model CustomerCard {
+  id                   String   @id @default(cuid())
+  name                 String
+  phone                String   @default("")
+  email                String?
+  currentAddress       String?
+  profileImage         String?
+  primaryContactMethod String   @default("phone") // visit | phone | email | web
+  hasTraded            Boolean  @default(false)
+  isSubscribed         Boolean  @default(false)
+  pipelineStage        String   @default("new") // new | touring | contracting | closed | dormant
+  budgetRange          String?
+  needsLoan            Boolean  @default(false)
+  purpose              String   @default("reside") // invest | reside
+  moveUrgency          String   @default("mid") // high | mid | low
+  moveDate             DateTime?
+  familyMembers        String?
+  preferredBrand       String?
+  decisionMaker        String?
+  inquiryDetails       String   @default("")
+  requestNotes         String   @default("")
+  specialNotes         String   @default("")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  interactions CustomerInteraction[]
+
+  @@index([phone])
+  @@index([pipelineStage])
+  @@index([moveDate])
+  @@index([createdAt])
+}
+
+model CustomerInteraction {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   CustomerCard @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  occurredAt DateTime @default(now())
+  channel    String   @default("phone") // visit | phone | email | web | tour | other
+  title      String   @default("")
+  body       String   @default("")
+  createdAt  DateTime @default(now())
+
+  @@index([customerId, occurredAt])
+}

@@ -5,6 +5,7 @@ import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingShell } from "@/components/landing/LandingShell";
 import { ProfileIntroContent } from "@/components/profile/ProfileIntroContent";
 import { UserBottomNav } from "@/components/user/UserShell";
+import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 
 export const metadata: Metadata = {
   title: "프로필 | 찬스부동산 경매중개",
@@ -15,6 +16,7 @@ export const metadata: Metadata = {
 export default function ProfilePage() {
   return (
     <LandingShell>
+      <AnalyticsPageView menuKey="profile" />
       <LandingHeader />
       <LandingNav />
       <div className="relative min-h-[70vh] overflow-hidden pb-24">

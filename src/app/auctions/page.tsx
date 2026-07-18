@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { isSupabaseEnabled } from "@/lib/supabase/config";
 import { listAuctionsFromSupabase } from "@/lib/supabase/repos/catalog";
 import type { Auction } from "@prisma/client";
+import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 
 export const metadata: Metadata = {
   title: "경매물건 | 찬스부동산 경매중개",
@@ -44,6 +45,7 @@ export default async function AuctionsPage({ searchParams }: PageProps) {
 
   return (
     <LandingShell>
+      <AnalyticsPageView menuKey="auctions" />
       <LandingHeader />
       <LandingNav />
       <div className="relative min-h-[70vh] overflow-hidden pb-24">

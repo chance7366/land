@@ -11,6 +11,7 @@ import {
   CONSULT_STATUS_META,
   SERVICE_CATEGORIES,
 } from "@/lib/consultation";
+import { trackBrowserEvent } from "@/lib/analytics/track";
 import type { ConsultationStatus } from "@prisma/client";
 
 const fieldClass =
@@ -188,6 +189,11 @@ export function ConsultationPageClient({
       setSubmitted({
         accessCode: data.accessCode,
         caseHint: String(data.id).slice(-4).toUpperCase(),
+      });
+      trackBrowserEvent({
+        eventType: "cta_click",
+        menuKey: "consultation",
+        metadata: { action: "consult_submit", category: category.title },
       });
       setStep(4);
     } catch {

@@ -23,6 +23,7 @@ import {
 import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
 import { isSupabaseEnabled } from "@/lib/supabase/config";
+import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 
 export const metadata: Metadata = {
   title: "부동산·지역소식 | 찬스부동산 경매중개",
@@ -166,6 +167,7 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
 
   return (
     <LandingShell>
+      <AnalyticsPageView menuKey="news" />
       <LandingHeader />
       <LandingNav />
       <div className="relative min-h-[70vh] overflow-hidden pb-24">
