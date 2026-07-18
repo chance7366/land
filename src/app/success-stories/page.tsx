@@ -4,6 +4,7 @@ import { LandingHeader } from "@/components/landing/LandingHeader";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingShell } from "@/components/landing/LandingShell";
 import { SuccessStoryBoardClient } from "@/components/success-stories/SuccessStoryBoardClient";
+import { UserBottomNav } from "@/components/user/UserShell";
 import { maskStoryAuthor } from "@/lib/success-story";
 import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
@@ -51,7 +52,7 @@ export default async function SuccessStoriesPage({
     <LandingShell>
       <LandingHeader />
       <LandingNav />
-      <div className="relative min-h-[70vh] overflow-hidden">
+      <div className="relative min-h-[70vh] overflow-hidden pb-24">
         <div className="hr-aurora-layer hr-aurora-violet pointer-events-none absolute inset-0" aria-hidden>
           <div className="hr3-glow absolute inset-0" />
         </div>
@@ -61,6 +62,7 @@ export default async function SuccessStoriesPage({
         </div>
       </div>
       <LandingFooter />
+      <UserBottomNav />
     </LandingShell>
   );
 }

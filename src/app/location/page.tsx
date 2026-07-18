@@ -4,6 +4,7 @@ import { LandingHeader } from "@/components/landing/LandingHeader";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingShell } from "@/components/landing/LandingShell";
 import { LocationPage } from "@/components/location/LocationPage";
+import { UserBottomNav } from "@/components/user/UserShell";
 import { LOCATION_INFO } from "@/lib/location";
 
 export const metadata: Metadata = {
@@ -16,7 +17,7 @@ export default function LocationRoutePage() {
     <LandingShell>
       <LandingHeader />
       <LandingNav />
-      <div className="relative min-h-[70vh] overflow-hidden">
+      <div className="relative min-h-[70vh] overflow-hidden pb-24">
         <div className="hr-aurora-layer hr-aurora-sapphire pointer-events-none absolute inset-0" aria-hidden>
           <div className="hr3-glow absolute inset-0" />
         </div>
@@ -26,6 +27,7 @@ export default function LocationRoutePage() {
         </div>
       </div>
       <LandingFooter />
+      <UserBottomNav />
     </LandingShell>
   );
 }

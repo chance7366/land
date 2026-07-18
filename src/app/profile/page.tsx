@@ -4,6 +4,7 @@ import { LandingHeader } from "@/components/landing/LandingHeader";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingShell } from "@/components/landing/LandingShell";
 import { ProfileIntroContent } from "@/components/profile/ProfileIntroContent";
+import { UserBottomNav } from "@/components/user/UserShell";
 
 export const metadata: Metadata = {
   title: "프로필 | 찬스부동산 경매중개",
@@ -16,7 +17,7 @@ export default function ProfilePage() {
     <LandingShell>
       <LandingHeader />
       <LandingNav />
-      <div className="relative min-h-[70vh] overflow-hidden">
+      <div className="relative min-h-[70vh] overflow-hidden pb-24">
         <div className="hr-aurora-layer hr-aurora-violet pointer-events-none absolute inset-0" aria-hidden>
           <div className="hr3-glow absolute inset-0" />
         </div>
@@ -24,6 +25,7 @@ export default function ProfilePage() {
         <ProfileIntroContent />
       </div>
       <LandingFooter />
+      <UserBottomNav />
     </LandingShell>
   );
 }

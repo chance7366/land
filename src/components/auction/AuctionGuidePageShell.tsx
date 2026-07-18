@@ -3,6 +3,7 @@ import { LandingFooter } from "@/components/landing/LandingFooter";
 import { LandingHeader } from "@/components/landing/LandingHeader";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingShell } from "@/components/landing/LandingShell";
+import { UserBottomNav } from "@/components/user/UserShell";
 
 /** 경매절차·입찰안내 — 히어로 앰버 골드 오로라 배경 */
 export function AuctionGuidePageShell({ children }: { children: ReactNode }) {
@@ -10,7 +11,7 @@ export function AuctionGuidePageShell({ children }: { children: ReactNode }) {
     <LandingShell>
       <LandingHeader />
       <LandingNav />
-      <div className="relative min-h-[70vh] overflow-hidden">
+      <div className="relative min-h-[70vh] overflow-hidden pb-24">
         <div className="hr-aurora-layer hr-aurora-amber pointer-events-none absolute inset-0" aria-hidden>
           <div className="hr3-glow absolute inset-0" />
         </div>
@@ -18,6 +19,7 @@ export function AuctionGuidePageShell({ children }: { children: ReactNode }) {
         <div className="relative z-10">{children}</div>
       </div>
       <LandingFooter />
+      <UserBottomNav />
     </LandingShell>
   );
 }

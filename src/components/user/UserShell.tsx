@@ -7,11 +7,13 @@ import { ChannelShortcuts } from "@/components/landing/ChannelShortcuts";
 import { ConsultHeaderButton } from "@/components/landing/ConsultHeaderButton";
 
 const NAV_ITEMS = [
-  { label: "부동산중개", icon: "home", href: "/properties" },
+  { label: "홈", icon: "home", href: "/" },
+  { label: "부동산중개", icon: "apartment", href: "/properties" },
   { label: "경매공매", icon: "gavel", href: "/auctions" },
   { label: "부동산·지역소식", icon: "newspaper", href: "/news" },
   { label: "찬스상담소", icon: "balance", href: "/legal" },
   { label: "성공스토리", icon: "star", href: "/success-stories" },
+  { label: "프로필", icon: "person", href: "/profile" },
   { label: "찾아오시는 길", icon: "location_on", href: "/location" },
 ];
 
@@ -83,22 +85,36 @@ export function UserBottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 z-50 grid w-full grid-cols-4 border-t border-white/10 bg-landing-bg/85 py-3 backdrop-blur-xl md:hidden">
-      {NAV_ITEMS.map((item) => {
-        const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-        return (
-          <Link
-            key={item.label}
-            href={item.href}
-            className={`flex flex-col items-center gap-1 transition-colors ${
-              active ? "text-blue-400" : "text-landing-muted hover:text-landing-text"
-            }`}
-          >
-            <MaterialIcon name={item.icon} filled={active} />
-            <span className={`font-caption ${active ? "font-bold" : "font-medium"}`}>{item.label}</span>
-          </Link>
-        );
-      })}
+    <nav
+      aria-label="모바일 서비스 메뉴"
+      className="fixed bottom-0 left-0 z-50 w-full border-t border-white/10 bg-landing-bg/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
+    >
+      <div className="flex items-stretch justify-start gap-0 overflow-x-auto overscroll-x-contain px-1 py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {NAV_ITEMS.map((item) => {
+          const active =
+            item.href === "/"
+              ? pathname === "/"
+              : pathname === item.href || pathname.startsWith(`${item.href}/`);
+          return (
+            <Link
+              key={item.label}
+              href={item.href}
+              className={`flex min-w-[4.75rem] shrink-0 flex-col items-center gap-0.5 px-1.5 py-1 transition-colors ${
+                active ? "text-blue-400" : "text-landing-muted hover:text-landing-text"
+              }`}
+            >
+              <MaterialIcon name={item.icon} filled={active} className="text-[22px]" />
+              <span
+                className={`max-w-[4.5rem] truncate text-center text-[10px] leading-tight ${
+                  active ? "font-bold" : "font-medium"
+                }`}
+              >
+                {item.label}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
     </nav>
   );
 }

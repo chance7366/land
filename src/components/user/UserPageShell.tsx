@@ -5,7 +5,7 @@ import { UserBottomNav } from "@/components/user/UserShell";
 
 export function UserPageShell({
   children,
-  showBottomNav = false,
+  showBottomNav = true,
   maxWidthClass = "max-w-3xl",
 }: {
   children: React.ReactNode;
