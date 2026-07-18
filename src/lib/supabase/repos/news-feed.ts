@@ -122,31 +122,55 @@ export async function getLandingNewsFromSupabase(now = new Date()) {
 
 export async function loadAdminNewsHealthFromSupabase() {
   const sb = createSupabaseAdminClient();
-  const { data, error } = await sb
-    .from("news_feed_items")
-    .select("source, pub_date, fetched_at");
-  if (error) throw error;
-
   const now = new Date();
-  const rows = (data ?? []).map(mapNewsFeedRow).filter((r) =>
-    passesVisibleFilter(r, "all", undefined, now),
-  );
-
   const bySource = new Map<
     string,
     { count: number; lastFetchedAt: Date | null; latestPubDate: Date | null }
   >();
-  for (const row of rows) {
-    const cur = bySource.get(row.source) ?? {
-      count: 0,
-      lastFetchedAt: null,
-      latestPubDate: null,
-    };
-    cur.count += 1;
-    if (!cur.lastFetchedAt || row.fetchedAt > cur.lastFetchedAt) cur.lastFetchedAt = row.fetchedAt;
-    if (!cur.latestPubDate || row.pubDate > cur.latestPubDate) cur.latestPubDate = row.pubDate;
-    bySource.set(row.source, cur);
-  }
+
+  // Supabase 기본 select 상한(1000행) 때문에 전체 테이블을 한 번에 읽으면
+  // r114·naver 등이 잘려 "0건·기록 없음"으로 오인됨 → 출처별 집계
+  await Promise.all(
+    NEWS_FEED_SOURCES.map(async (meta) => {
+      const cutoff = newsFeedCutoffForSource(meta.key, now).toISOString();
+      const table = () => sb.from("news_feed_items");
+
+      const [{ count, error: countErr }, { data: fetchRow, error: fetchErr }, { data: pubRow, error: pubErr }] =
+        await Promise.all([
+          table()
+            .select("*", { count: "exact", head: true })
+            .eq("source", meta.key)
+            .gte("pub_date", cutoff),
+          table()
+            .select("fetched_at")
+            .eq("source", meta.key)
+            .gte("pub_date", cutoff)
+            .order("fetched_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          table()
+            .select("pub_date")
+            .eq("source", meta.key)
+            .gte("pub_date", cutoff)
+            .order("pub_date", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+        ]);
+
+      if (countErr) throw countErr;
+      if (fetchErr) throw fetchErr;
+      if (pubErr) throw pubErr;
+
+      bySource.set(meta.key, {
+        count: count ?? 0,
+        lastFetchedAt: fetchRow?.fetched_at
+          ? new Date(String(fetchRow.fetched_at))
+          : null,
+        latestPubDate: pubRow?.pub_date ? new Date(String(pubRow.pub_date)) : null,
+      });
+    }),
+  );
+
   return bySource;
 }
 

@@ -205,7 +205,7 @@ export function AuctionSplitDetail({ auction, onBack, showBack }: Props) {
       </div>
 
       <Section n={1} title="기본정보">
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2 grid-cols-2">
           <Fact label="사건번호" value={auction.caseNumber} accent="text-[#c4b5fd]" />
           <Fact label="물건번호" value={String(auction.itemNo)} />
           <Fact label="경매종류" value={auction.auctionType} />
@@ -216,14 +216,14 @@ export function AuctionSplitDetail({ auction, onBack, showBack }: Props) {
           <Fact label="지역" value={auction.region} />
           <Fact label="상태" value={statusLabel(auction.status)} />
           <Fact label="안전등급" value={safetyLabel(auction.safetyGrade)} />
-          <div className="sm:col-span-2">
+          <div className="col-span-2">
             <Fact label="제목" value={auction.title} />
           </div>
         </div>
       </Section>
 
       <Section n={2} title="가격 · 기일">
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2 grid-cols-2">
           <Fact
             label="감정가"
             value={formatAuctionMoney(auction.appraisalPrice)}
@@ -273,7 +273,7 @@ export function AuctionSplitDetail({ auction, onBack, showBack }: Props) {
       </Section>
 
       <Section n={3} title="물건상세">
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2 grid-cols-2">
           {auction.formGroup === "UNIT" ? (
             <Fact label="전유면적" value={fmtArea(auction.exclusiveArea)} />
           ) : (
@@ -287,16 +287,16 @@ export function AuctionSplitDetail({ auction, onBack, showBack }: Props) {
           {auction.saleShare ? <Fact label="매각지분" value={auction.saleShare} /> : null}
           <Fact label="점유" value={auction.possessionNote} />
           <Fact label="임차관계" value={auction.leaseNote} />
-          <div className="sm:col-span-2">
+          <div className="col-span-2">
             <Fact label="매수인 인수 권리" value={auction.assumeRightsNote} />
           </div>
           {auction.remarks ? (
-            <div className="sm:col-span-2">
+            <div className="col-span-2">
               <Fact label="물건비고" value={auction.remarks} />
             </div>
           ) : null}
           {auction.appraisalSummary ? (
-            <div className="sm:col-span-2">
+            <div className="col-span-2">
               <Fact label="감정요약" value={auction.appraisalSummary} />
             </div>
           ) : null}
