@@ -186,9 +186,17 @@ export function QaBoardClient({ initialItems, initialOpenId = null }: Props) {
   }
 
   useEffect(() => {
-    if (!initialOpenId) return;
-    const target = initialItems.find((p) => p.id === initialOpenId);
-    if (target) void openPost(target);
+    if (initialOpenId) {
+      const target = initialItems.find((p) => p.id === initialOpenId);
+      if (target) void openPost(target);
+      return;
+    }
+    // PC: 첫 공개글을 바로 열어 답변이 보이게. 모바일은 목록만 유지.
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches) {
+      return;
+    }
+    const first = initialItems.find((p) => !p.isSecret);
+    if (first) void openPost(first);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- open once on mount
   }, [initialOpenId]);
 

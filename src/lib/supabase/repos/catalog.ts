@@ -99,10 +99,47 @@ export async function listLegalQuestionsFromSupabase(take = 100) {
   const { data, error } = await sb
     .from("legal_questions")
     .select("*")
+    .eq("is_public", true)
     .order("created_at", { ascending: false })
     .limit(take);
   if (error) throw error;
   return (data ?? []).map(mapLegalRow);
+}
+
+export async function getLegalQuestionFromSupabase(id: string) {
+  const sb = createSupabaseDataClient();
+  const { data, error } = await sb.from("legal_questions").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data ? mapLegalRow(data) : null;
+}
+
+export async function createLegalQuestionInSupabase(input: {
+  category: string;
+  question: string;
+  content: string;
+  authorName: string;
+  phone?: string | null;
+  isSecret: boolean;
+  accessCode: string;
+}) {
+  const sb = createSupabaseDataClient();
+  const { data, error } = await sb
+    .from("legal_questions")
+    .insert({
+      category: input.category,
+      question: input.question,
+      content: input.content,
+      author_name: input.authorName,
+      phone: input.phone ?? null,
+      is_secret: input.isSecret,
+      access_code: input.isSecret ? input.accessCode : "",
+      is_public: !input.isSecret,
+      status: "PENDING",
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return mapLegalRow(data);
 }
 
 export async function listSuccessStoriesFromSupabase(take = 200) {

@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { maskAuthor } from "@/lib/qa";
+import { isSupabaseEnabled } from "@/lib/supabase/config";
+import {
+  createLegalQuestionInSupabase,
+  listLegalQuestionsFromSupabase,
+} from "@/lib/supabase/repos/catalog";
 
 export async function GET() {
   try {
-    const items = await prisma.legalQuestion.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 100,
-    });
+    const items = isSupabaseEnabled()
+      ? await listLegalQuestionsFromSupabase(100)
+      : await prisma.legalQuestion.findMany({
+          where: { isPublic: true },
+          orderBy: { createdAt: "desc" },
+          take: 100,
+        });
 
     return NextResponse.json(
       items.map((row) => ({
@@ -48,19 +56,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "비밀글 비밀번호 4자리를 입력해주세요." }, { status: 400 });
     }
 
-    const row = await prisma.legalQuestion.create({
-      data: {
-        category,
-        question,
-        content,
-        authorName,
-        phone,
-        isSecret,
-        accessCode: isSecret ? accessCode : "",
-        isPublic: !isSecret,
-        status: "PENDING",
-      },
-    });
+    const row = isSupabaseEnabled()
+      ? await createLegalQuestionInSupabase({
+          category,
+          question,
+          content,
+          authorName,
+          phone,
+          isSecret,
+          accessCode: isSecret ? accessCode : "",
+        })
+      : await prisma.legalQuestion.create({
+          data: {
+            category,
+            question,
+            content,
+            authorName,
+            phone,
+            isSecret,
+            accessCode: isSecret ? accessCode : "",
+            isPublic: !isSecret,
+            status: "PENDING",
+          },
+        });
 
     return NextResponse.json(
       {
@@ -72,7 +90,8 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 },
     );
-  } catch {
+  } catch (err) {
+    console.error("[api/legal-questions POST]", err);
     return NextResponse.json({ error: "질문 등록 중 오류가 발생했습니다." }, { status: 500 });
   }
 }

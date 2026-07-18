@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ANSWER_FOOTER, maskAuthor } from "@/lib/qa";
+import { isSupabaseEnabled } from "@/lib/supabase/config";
+import { getLegalQuestionFromSupabase } from "@/lib/supabase/repos/catalog";
 
 /** 비밀글 열람 또는 공개글 상세 */
 export async function POST(request: NextRequest) {
@@ -13,7 +15,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "게시글 ID가 필요합니다." }, { status: 400 });
     }
 
-    const row = await prisma.legalQuestion.findUnique({ where: { id } });
+    const row = isSupabaseEnabled()
+      ? await getLegalQuestionFromSupabase(id)
+      : await prisma.legalQuestion.findUnique({ where: { id } });
+
     if (!row) {
       return NextResponse.json({ error: "게시글을 찾을 수 없습니다." }, { status: 404 });
     }
@@ -39,7 +44,8 @@ export async function POST(request: NextRequest) {
       suggestConsult: row.suggestConsult,
       answerFooter: ANSWER_FOOTER,
     });
-  } catch {
+  } catch (err) {
+    console.error("[api/legal-questions/detail]", err);
     return NextResponse.json({ error: "조회 중 오류가 발생했습니다." }, { status: 500 });
   }
 }
