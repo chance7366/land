@@ -5,6 +5,8 @@ import {
   parseAuctionAttachments,
   stringifyAuctionAttachments,
 } from "@/lib/auction-attachments";
+import { isSupabaseEnabled } from "@/lib/supabase/config";
+import { listAllAuctionsAdminSupabase } from "@/lib/supabase/repos/admin-catalog";
 
 export type AuctionInput = {
   manageCode?: string | null;
@@ -210,10 +212,12 @@ export function parseAuctionBody(
 }
 
 export async function getAllAuctionsAdmin() {
-  const items = await prisma.auction.findMany({
-    orderBy: [{ saleDate: "asc" }, { caseNumber: "asc" }, { itemNo: "asc" }],
-  });
-  // SQLite null saleDate → 뒤로
+  const items = isSupabaseEnabled()
+    ? ((await listAllAuctionsAdminSupabase()) as Auction[])
+    : await prisma.auction.findMany({
+        orderBy: [{ saleDate: "asc" }, { caseNumber: "asc" }, { itemNo: "asc" }],
+      });
+  // null saleDate → 뒤로
   return items.sort((a, b) => {
     if (!a.saleDate && !b.saleDate) {
       return a.caseNumber.localeCompare(b.caseNumber, "ko") || (a.itemNo ?? 1) - (b.itemNo ?? 1);

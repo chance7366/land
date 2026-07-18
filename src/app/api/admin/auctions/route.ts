@@ -3,10 +3,22 @@ import { prisma } from "@/lib/prisma";
 import { getAllAuctionsAdmin, parseAuctionBody, toAuctionCreateData } from "@/lib/auction-service";
 import { allocateNextManageCode, parseConflictAction } from "@/lib/manage-code";
 import { scheduleNotifyMatchingSubscribers } from "@/lib/subscription-notify";
+import { isSupabaseEnabled } from "@/lib/supabase/config";
+import {
+  createAuctionSupabase,
+  findAuctionByCaseSupabase,
+  findAuctionByManageCodeSupabase,
+  updateAuctionSupabase,
+} from "@/lib/supabase/repos/admin-catalog";
 
 export async function GET() {
-  const items = await getAllAuctionsAdmin();
-  return NextResponse.json(items);
+  try {
+    const items = await getAllAuctionsAdmin();
+    return NextResponse.json(items);
+  } catch (e) {
+    console.error("[admin/auctions GET]", e);
+    return NextResponse.json({ error: "목록 조회 실패" }, { status: 500 });
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -23,7 +35,51 @@ export async function POST(request: NextRequest) {
         ? Math.max(1, Math.round(Number(parsed.data.itemNo)))
         : 1;
 
-    // 동일 사건·물건번호가 있으면 해당 관리코드 충돌로 처리
+    if (isSupabaseEnabled()) {
+      const sameCase = await findAuctionByCaseSupabase(parsed.data.caseNumber, itemNo);
+      let manageCode = parsed.data.manageCode?.trim() || null;
+      if (sameCase?.manageCode && conflictAction !== "create_new") {
+        manageCode = sameCase.manageCode;
+      }
+      if (!manageCode || conflictAction === "create_new") {
+        manageCode = await allocateNextManageCode("AUCTION");
+      }
+
+      const existingByCode = await findAuctionByManageCodeSupabase(manageCode);
+      const existing = existingByCode ?? (conflictAction !== "create_new" ? sameCase : null);
+
+      if (existing) {
+        const code = existing.manageCode || manageCode;
+        if (conflictAction === "overwrite") {
+          const auction = await updateAuctionSupabase(existing.id, {
+            ...parsed.data,
+            manageCode: code,
+          });
+          scheduleNotifyMatchingSubscribers({
+            entityType: "AUCTION",
+            entity: auction as never,
+          });
+          return NextResponse.json(auction);
+        }
+        return NextResponse.json(
+          {
+            error: `관리코드 ${code} 가 이미 등록되어 있습니다.`,
+            code: "MANAGE_CODE_CONFLICT",
+            manageCode: code,
+            existingId: existing.id,
+          },
+          { status: 409 },
+        );
+      }
+
+      const auction = await createAuctionSupabase({ ...parsed.data, manageCode });
+      scheduleNotifyMatchingSubscribers({
+        entityType: "AUCTION",
+        entity: auction as never,
+      });
+      return NextResponse.json(auction, { status: 201 });
+    }
+
     const sameCase = await prisma.auction.findFirst({
       where: { caseNumber: parsed.data.caseNumber, itemNo },
       orderBy: { createdAt: "asc" },
@@ -66,7 +122,8 @@ export async function POST(request: NextRequest) {
     });
     scheduleNotifyMatchingSubscribers({ entityType: "AUCTION", entity: auction });
     return NextResponse.json(auction, { status: 201 });
-  } catch {
+  } catch (e) {
+    console.error("[admin/auctions POST]", e);
     return NextResponse.json({ error: "경매 등록 중 오류가 발생했습니다." }, { status: 500 });
   }
 }

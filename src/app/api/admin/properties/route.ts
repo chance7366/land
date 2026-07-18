@@ -3,20 +3,31 @@ import { prisma } from "@/lib/prisma";
 import { getAllPropertiesAdmin, parsePropertyBody, toPropertyCreateData } from "@/lib/property-service";
 import { allocateNextManageCode, parseConflictAction } from "@/lib/manage-code";
 import { scheduleNotifyMatchingSubscribers } from "@/lib/subscription-notify";
+import { isSupabaseEnabled } from "@/lib/supabase/config";
+import {
+  createPropertySupabase,
+  findPropertyByManageCodeSupabase,
+  updatePropertySupabase,
+} from "@/lib/supabase/repos/admin-catalog";
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const category = searchParams.get("category") ?? undefined;
-  const type = searchParams.get("deal") ?? undefined;
-  const status = searchParams.get("status") ?? undefined;
+  try {
+    const { searchParams } = new URL(request.url);
+    const category = searchParams.get("category") ?? undefined;
+    const type = searchParams.get("deal") ?? undefined;
+    const status = searchParams.get("status") ?? undefined;
 
-  const items = await getAllPropertiesAdmin({
-    category: category as never,
-    type: type as never,
-    status: status || undefined,
-  });
+    const items = await getAllPropertiesAdmin({
+      category: category as never,
+      type: type as never,
+      status: status || undefined,
+    });
 
-  return NextResponse.json(items);
+    return NextResponse.json(items);
+  } catch (e) {
+    console.error("[admin/properties GET]", e);
+    return NextResponse.json({ error: "목록 조회 실패" }, { status: 500 });
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -32,6 +43,38 @@ export async function POST(request: NextRequest) {
 
     if (!manageCode || conflictAction === "create_new") {
       manageCode = await allocateNextManageCode("PROPERTY");
+    }
+
+    if (isSupabaseEnabled()) {
+      const existing = await findPropertyByManageCodeSupabase(manageCode);
+      if (existing) {
+        if (conflictAction === "overwrite") {
+          const property = await updatePropertySupabase(existing.id, {
+            ...parsed.data,
+            manageCode,
+          });
+          scheduleNotifyMatchingSubscribers({
+            entityType: "PROPERTY",
+            entity: property as never,
+          });
+          return NextResponse.json(property);
+        }
+        return NextResponse.json(
+          {
+            error: `관리코드 ${manageCode} 가 이미 등록되어 있습니다.`,
+            code: "MANAGE_CODE_CONFLICT",
+            manageCode,
+            existingId: existing.id,
+          },
+          { status: 409 },
+        );
+      }
+      const property = await createPropertySupabase({ ...parsed.data, manageCode });
+      scheduleNotifyMatchingSubscribers({
+        entityType: "PROPERTY",
+        entity: property as never,
+      });
+      return NextResponse.json(property, { status: 201 });
     }
 
     const existing = await prisma.property.findUnique({ where: { manageCode } });
@@ -60,7 +103,8 @@ export async function POST(request: NextRequest) {
     });
     scheduleNotifyMatchingSubscribers({ entityType: "PROPERTY", entity: property });
     return NextResponse.json(property, { status: 201 });
-  } catch {
+  } catch (e) {
+    console.error("[admin/properties POST]", e);
     return NextResponse.json({ error: "매물 등록 중 오류가 발생했습니다." }, { status: 500 });
   }
 }

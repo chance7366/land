@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
 import { PropertyForm } from "@/components/admin/PropertyForm";
+import { isSupabaseEnabled } from "@/lib/supabase/config";
+import { listAllPropertiesAdminSupabase } from "@/lib/supabase/repos/admin-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +12,13 @@ export default async function AdminPropertyEditPage({ params }: { params: Promis
   const { id } = await params;
   const property = await withDbFallback(
     "admin-property-edit",
-    () => prisma.property.findUnique({ where: { id } }),
+    async () => {
+      if (isSupabaseEnabled()) {
+        const items = await listAllPropertiesAdminSupabase();
+        return items.find((p) => p.id === id) ?? null;
+      }
+      return prisma.property.findUnique({ where: { id } });
+    },
     null,
   );
   if (!property) notFound();

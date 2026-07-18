@@ -1,5 +1,6 @@
 import { AppLink as Link } from "@/components/ui/AppLink";
 import { getAdminDashboardData } from "@/lib/data";
+import { SeedDemoButton } from "@/components/admin/SeedDemoButton";
 import { SyncButton } from "@/components/admin/SyncButton";
 import { GlassCard } from "@/components/ui/GlassCard";
 
@@ -38,16 +39,11 @@ export default async function AdminDashboardPage() {
           <p className="font-body-md text-landing-muted">실시간 운영 현황 및 서비스 통합 관리</p>
         </div>
         <div className="flex items-center gap-4">
+          <SeedDemoButton />
           <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2">
             <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400"></span>
             <span className="font-label-md text-landing-muted">System Online</span>
           </div>
-          <button
-            type="button"
-            className="rounded-lg bg-gradient-to-r from-cta-from to-cta-to px-6 py-2 font-label-md text-white hover:opacity-90"
-          >
-            시스템 로그 확인
-          </button>
         </div>
       </header>
 

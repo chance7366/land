@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import { isSupabaseEnabled } from "@/lib/supabase/config";
+import { allocateNextManageCodeSupabase } from "@/lib/supabase/repos/admin-catalog";
 
 export type ManageCodeKind = "PROPERTY" | "AUCTION";
 
@@ -49,6 +51,9 @@ async function maxSeq(kind: ManageCodeKind): Promise<number> {
 
 /** 다음 관리코드 발급 (매물_00000001 / 경매_00000001) */
 export async function allocateNextManageCode(kind: ManageCodeKind): Promise<string> {
+  if (isSupabaseEnabled()) {
+    return allocateNextManageCodeSupabase(kind);
+  }
   const next = (await maxSeq(kind)) + 1;
   return formatManageCode(kind, next);
 }

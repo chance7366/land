@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
 import { AuctionForm } from "@/components/admin/AuctionForm";
+import { isSupabaseEnabled } from "@/lib/supabase/config";
+import { listAllAuctionsAdminSupabase } from "@/lib/supabase/repos/admin-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +12,13 @@ export default async function AdminAuctionEditPage({ params }: { params: Promise
   const { id } = await params;
   const auction = await withDbFallback(
     "admin-auction-edit",
-    () => prisma.auction.findUnique({ where: { id } }),
+    async () => {
+      if (isSupabaseEnabled()) {
+        const items = await listAllAuctionsAdminSupabase();
+        return items.find((a) => a.id === id) ?? null;
+      }
+      return prisma.auction.findUnique({ where: { id } });
+    },
     null,
   );
   if (!auction) notFound();

@@ -5,6 +5,8 @@ import {
   collectSpecsFromBody,
   validatePropertyForm,
 } from "@/lib/property-naver/validation";
+import { isSupabaseEnabled } from "@/lib/supabase/config";
+import { listAllPropertiesAdminSupabase } from "@/lib/supabase/repos/admin-catalog";
 
 export async function getProperties(filters: PropertyListFilters = {}) {
   const where: Prisma.PropertyWhereInput = {
@@ -68,6 +70,14 @@ export async function getAllPropertiesAdmin(filters?: {
   type?: PropertyType;
   status?: string;
 }) {
+  if (isSupabaseEnabled()) {
+    let items = await listAllPropertiesAdminSupabase();
+    if (filters?.category) items = items.filter((p) => p.category === filters.category);
+    if (filters?.type) items = items.filter((p) => p.type === filters.type);
+    if (filters?.status) items = items.filter((p) => p.status === filters.status);
+    return items as Awaited<ReturnType<typeof prisma.property.findMany>>;
+  }
+
   const where: Prisma.PropertyWhereInput = {};
   if (filters?.category) where.category = filters.category;
   if (filters?.type) where.type = filters.type;
