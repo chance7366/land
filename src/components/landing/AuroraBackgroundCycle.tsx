@@ -243,7 +243,7 @@ export function AuroraPenHeroPreview({
       <div className="relative z-10 mx-auto flex max-w-6xl flex-col">
         <div className="mx-auto w-full max-w-4xl text-center">
           <div
-            className="hero-marquee mx-auto mb-4 w-full max-w-[448px]"
+            className="hero-marquee mx-auto mb-4 w-full max-w-[180px] sm:max-w-[280px] md:max-w-[448px]"
             aria-label={HERO_EYEBROW_TEXT}
           >
             <div className="hero-marquee__track">

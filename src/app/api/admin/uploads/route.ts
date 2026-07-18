@@ -3,6 +3,8 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { getUploadDir, uploadUrlPrefix, type UploadKind } from "@/lib/uploads";
+import { isSupabaseEnabled, PROPERTY_IMAGES_BUCKET } from "@/lib/supabase/config";
+import { uploadPropertyImage } from "@/lib/supabase/storage";
 
 const MAX_FILES = 8;
 const MAX_BYTES = 12 * 1024 * 1024;
@@ -40,10 +42,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "한 번에 최대 5장까지 업로드할 수 있습니다." }, { status: 400 });
     }
 
-    const uploadDir = getUploadDir(kind);
-    await mkdir(uploadDir, { recursive: true });
-
     const urls: string[] = [];
+    const useSupabase = isSupabaseEnabled();
+
+    if (!useSupabase) {
+      await mkdir(getUploadDir(kind), { recursive: true });
+    }
+
     const prefix = uploadUrlPrefix(kind);
 
     for (const file of files) {
@@ -60,11 +65,21 @@ export async function POST(request: NextRequest) {
       const ext = EXT_BY_TYPE[file.type] ?? "jpg";
       const filename = `${Date.now()}-${randomUUID().slice(0, 8)}.${ext}`;
       const buffer = Buffer.from(await file.arrayBuffer());
-      await writeFile(path.join(uploadDir, filename), buffer);
-      urls.push(`${prefix}/${filename}`);
+
+      if (useSupabase) {
+        const storagePath = `${kind}/${filename}`;
+        const publicUrl = await uploadPropertyImage(storagePath, buffer, file.type);
+        urls.push(publicUrl);
+      } else {
+        await writeFile(path.join(getUploadDir(kind), filename), buffer);
+        urls.push(`${prefix}/${filename}`);
+      }
     }
 
-    return NextResponse.json({ urls }, { status: 201 });
+    return NextResponse.json(
+      { urls, storage: useSupabase ? PROPERTY_IMAGES_BUCKET : "local" },
+      { status: 201 },
+    );
   } catch {
     return NextResponse.json({ error: "사진 업로드 중 오류가 발생했습니다." }, { status: 500 });
   }

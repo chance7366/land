@@ -47,7 +47,7 @@ export function LandingNav() {
       aria-label="서비스 메뉴"
       className="relative z-30 border-b border-landing-border bg-landing-bg"
     >
-      <ul className="mx-auto flex max-w-6xl items-stretch justify-center gap-1 px-container-padding-mobile md:gap-2 md:px-8">
+      <ul className="mx-auto flex max-w-6xl items-stretch justify-start gap-0 overflow-x-auto overscroll-x-contain px-container-padding-mobile [-ms-overflow-style:none] [scrollbar-width:none] md:justify-center md:gap-2 md:overflow-visible md:px-8 [&::-webkit-scrollbar]:hidden">
         {items.map((item) => {
           const children = item.children;
           const active = children
@@ -58,7 +58,7 @@ export function LandingNav() {
             return (
               <li
                 key={item.label}
-                className="relative flex-1 md:flex-none"
+                className="relative shrink-0"
                 onMouseEnter={() => setAuctionOpen(true)}
                 onMouseLeave={() => setAuctionOpen(false)}
               >
@@ -67,7 +67,7 @@ export function LandingNav() {
                   aria-haspopup="menu"
                   aria-expanded={auctionOpen}
                   style={{ ["--nav-accent" as string]: item.accent }}
-                  className={`flex h-11 w-full items-center justify-center border-b-2 px-3 text-sm font-semibold transition-colors md:px-5 ${
+                  className={`flex h-11 w-full items-center justify-center whitespace-nowrap border-b-2 px-2.5 text-[11px] font-semibold transition-colors sm:px-3 sm:text-xs md:px-5 md:text-sm ${
                     active
                       ? "border-[color:var(--nav-accent)] text-[color:var(--nav-accent)]"
                       : "border-transparent text-landing-muted hover:border-[color:var(--nav-accent)] hover:text-white"
@@ -109,11 +109,11 @@ export function LandingNav() {
           }
 
           return (
-            <li key={item.href} className="flex-1 md:flex-none">
+            <li key={item.href} className="shrink-0">
               <Link
                 href={item.href}
                 style={{ ["--nav-accent" as string]: item.accent }}
-                className={`flex h-11 items-center justify-center border-b-2 px-3 text-sm font-semibold transition-colors md:px-5 ${
+                className={`flex h-11 items-center justify-center whitespace-nowrap border-b-2 px-2.5 text-[11px] font-semibold transition-colors sm:px-3 sm:text-xs md:px-5 md:text-sm ${
                   active
                     ? "border-[color:var(--nav-accent)] text-[color:var(--nav-accent)]"
                     : "border-transparent text-landing-muted hover:border-[color:var(--nav-accent)] hover:text-white"
