@@ -10,7 +10,7 @@ insert into public.properties (
   '매물_DEMO_001',
   '내포신도시 센트럴자이 84㎡',
   '학군·생활편의 우수. 즉시 입주 가능.',
-  'SALE', 'APARTMENT', 385000000,
+  'SALE', 'APARTMENT', 38500,
   '충남 홍성군 홍북읍 신경리', '내포신도시',
   '센트럴자이', 84.5, 12, 25,
   '[]'::jsonb, '["즉시입주","학군"]'::jsonb, true, 'ACTIVE'
@@ -28,7 +28,7 @@ on conflict (manage_code) do nothing;
 
 -- 월세 필드 보정
 update public.properties
-set deposit = 3000000, monthly_rent = 450000, is_jeonse = false
+set deposit = 300, monthly_rent = 45, is_jeonse = false, price = 0
 where manage_code = '매물_DEMO_002';
 
 insert into public.auctions (
