@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { LegalQuestion, LegalQuestionStatus } from "@prisma/client";
+import type { LegalQuestionStatus } from "@prisma/client";
 import { AppLink as Link } from "@/components/ui/AppLink";
 import { DataTable } from "@/components/ui/DataTable";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -10,7 +10,25 @@ import { QA_STATUS_META } from "@/lib/qa";
 const fieldClass =
   "w-full rounded-xl border border-landing-border bg-landing-elevated px-4 py-3 text-sm text-landing-text focus:border-[#34d399] focus:outline-none";
 
-type Row = LegalQuestion;
+/** 서버에서 ISO 문자열로 직렬화된 행 */
+type Row = {
+  id: string;
+  category: string;
+  question: string;
+  content: string;
+  authorName: string;
+  phone: string | null;
+  answer: string | null;
+  answerer: string | null;
+  status: LegalQuestionStatus;
+  isPublic: boolean;
+  isSecret: boolean;
+  accessCode: string;
+  suggestConsult: boolean;
+  answeredAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
 
 export function AdminLegalQuestionsClient({ initialItems }: { initialItems: Row[] }) {
   const [items, setItems] = useState(initialItems);

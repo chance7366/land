@@ -107,6 +107,46 @@ export async function listLegalQuestionsFromSupabase(take = 100) {
   return (data ?? []).map(mapLegalRow);
 }
 
+/** 관리자 — 전체 질문(비공개·비밀 포함) */
+export async function listAllLegalQuestionsFromSupabase(take = 500) {
+  const sb = createSupabaseDataClient();
+  const { data, error } = await sb
+    .from("legal_questions")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(take);
+  if (error) throw error;
+  return (data ?? []).map(mapLegalRow);
+}
+
+export async function updateLegalQuestionInSupabase(
+  id: string,
+  input: {
+    status: string;
+    answer: string | null;
+    answerer: string | null;
+    answeredAt: Date | null;
+    suggestConsult: boolean;
+  },
+) {
+  const sb = createSupabaseDataClient();
+  const { data, error } = await sb
+    .from("legal_questions")
+    .update({
+      status: input.status,
+      answer: input.answer,
+      answerer: input.answerer,
+      answered_at: input.answeredAt ? input.answeredAt.toISOString() : null,
+      suggest_consult: input.suggestConsult,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return mapLegalRow(data);
+}
+
 export async function getLegalQuestionFromSupabase(id: string) {
   const sb = createSupabaseDataClient();
   const { data, error } = await sb.from("legal_questions").select("*").eq("id", id).maybeSingle();
