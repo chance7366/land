@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Pencil } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { MobileBoardDetail } from "@/components/ui/MobileBoardDetail";
 import {
   SUCCESS_STORY_CATEGORIES,
   SUCCESS_STORY_WRITE_CATEGORIES,
@@ -61,6 +62,27 @@ export function SuccessStoryBoardClient({ initialItems, initialOpenId = null }: 
   const selected = useMemo(
     () => posts.find((p) => p.id === selectedId) ?? null,
     [posts, selectedId],
+  );
+
+  const mobileDetailOpen = Boolean(selected);
+
+  const detailBody = selected ? (
+    <GlassCard className="p-5">
+      <span className="rounded-full border border-[#fbbf24]/35 bg-[#fbbf24]/10 px-2.5 py-0.5 text-[11px] font-bold text-[#fde68a]">
+        {selected.category}
+      </span>
+      <h2 className="mt-3 text-base font-bold text-white">{selected.title}</h2>
+      <p className="mt-1 text-xs text-white/40">
+        {selected.authorMasked} · {formatStoryDate(selected.createdAt)}
+      </p>
+      <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-white/75">
+        {selected.content}
+      </p>
+    </GlassCard>
+  ) : (
+    <GlassCard className="flex h-48 items-center justify-center p-5 text-sm text-white/45">
+      목록에서 후기를 선택하세요.
+    </GlassCard>
   );
 
   async function submitWrite(e: React.FormEvent) {
@@ -145,7 +167,7 @@ export function SuccessStoryBoardClient({ initialItems, initialOpenId = null }: 
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-        <div className="space-y-2 lg:hidden">
+        <div className={`space-y-2 lg:hidden ${mobileDetailOpen ? "hidden" : ""}`}>
           {filtered.length === 0 ? (
             <GlassCard className="p-8 text-center text-sm text-white/45">
               등록된 후기가 없습니다.
@@ -219,42 +241,9 @@ export function SuccessStoryBoardClient({ initialItems, initialOpenId = null }: 
           </div>
         </GlassCard>
 
-        <div
-          className={`space-y-4 ${
-            selected
-              ? "fixed inset-0 z-40 overflow-y-auto bg-landing-bg px-4 pb-24 pt-3 lg:static lg:z-auto lg:overflow-visible lg:bg-transparent lg:p-0 lg:pb-0"
-              : "hidden lg:block"
-          }`}
-        >
-          {selected ? (
-            <button
-              type="button"
-              onClick={() => setSelectedId(null)}
-              className="mb-2 inline-flex items-center gap-1 text-sm font-semibold text-[#fde68a] lg:hidden"
-            >
-              ← 목록으로
-            </button>
-          ) : null}
-          {selected ? (
-            <GlassCard className="p-5">
-              <span className="rounded-full border border-[#fbbf24]/35 bg-[#fbbf24]/10 px-2.5 py-0.5 text-[11px] font-bold text-[#fde68a]">
-                {selected.category}
-              </span>
-              <h2 className="mt-3 text-base font-bold text-white">{selected.title}</h2>
-              <p className="mt-1 text-xs text-white/40">
-                {selected.authorMasked} · {formatStoryDate(selected.createdAt)}
-              </p>
-              <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-white/75">
-                {selected.content}
-              </p>
-            </GlassCard>
-          ) : (
-            <GlassCard className="flex h-48 items-center justify-center p-5 text-sm text-white/45">
-              목록에서 후기를 선택하세요.
-            </GlassCard>
-          )}
-
-          <GlassCard className="hidden p-5 lg:block">
+        <div className="hidden space-y-4 lg:block">
+          {detailBody}
+          <GlassCard className="p-5">
             <p className="text-xs leading-relaxed text-white/60">
               성공스토리는 실제 이용 고객의 공개 후기입니다. 서비스 경험과 만족하신 점을 자유롭게
               남겨 주세요.
@@ -262,6 +251,14 @@ export function SuccessStoryBoardClient({ initialItems, initialOpenId = null }: 
           </GlassCard>
         </div>
       </div>
+
+      <MobileBoardDetail
+        open={mobileDetailOpen}
+        onClose={() => setSelectedId(null)}
+        accentClassName="text-[#fde68a]"
+      >
+        {detailBody}
+      </MobileBoardDetail>
 
       {writeOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/65 p-4 backdrop-blur-sm">

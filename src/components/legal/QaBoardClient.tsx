@@ -5,6 +5,7 @@ import type { LegalQuestionStatus } from "@prisma/client";
 import { CalendarDays, Lock, Pencil } from "lucide-react";
 import { AppLink as Link } from "@/components/ui/AppLink";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { MobileBoardDetail } from "@/components/ui/MobileBoardDetail";
 import {
   ANSWER_FOOTER,
   QA_CATEGORIES,
@@ -216,6 +217,54 @@ export function QaBoardClient({ initialItems, initialOpenId = null }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- open once on mount
   }, [initialOpenId]);
 
+  const mobileDetailOpen = Boolean(selected || loadingDetail);
+
+  const detailBody = loadingDetail ? (
+    <GlassCard className="flex h-48 items-center justify-center p-5 text-sm text-white/45">
+      불러오는 중…
+    </GlassCard>
+  ) : selected ? (
+    <GlassCard className="p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="rounded-full border border-white/15 px-2.5 py-0.5 text-[11px] font-bold text-white/60">
+          {selected.category}
+        </span>
+        <StatusBadge status={selected.status} />
+      </div>
+      <h2 className="mt-3 text-base font-bold text-white">{selected.question}</h2>
+      <p className="mt-1 text-xs text-white/40">
+        {selected.authorMasked} · {formatQaDate(selected.createdAt)}
+      </p>
+      <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-white/75">
+        {selected.content}
+      </p>
+
+      {selected.answer ? (
+        <div className="mt-5 rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-4">
+          <p className="text-xs font-bold text-emerald-300">
+            전문가 답변{selected.answerer ? ` · ${selected.answerer}` : ""}
+          </p>
+          <p className="mt-2 whitespace-pre-wrap text-sm text-white/85">{selected.answer}</p>
+          <p className="mt-3 border-t border-white/10 pt-3 text-xs leading-relaxed text-white/50">
+            {selected.answerFooter || ANSWER_FOOTER}
+          </p>
+          <Link
+            href={consultHrefFromQaCategory(selected.category)}
+            className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-[#6ee7b7] hover:underline"
+          >
+            방문/전화/출장 상담예약 →
+          </Link>
+        </div>
+      ) : (
+        <p className="mt-5 text-sm text-white/45">아직 답변이 등록되지 않았습니다.</p>
+      )}
+    </GlassCard>
+  ) : (
+    <GlassCard className="flex h-48 items-center justify-center p-5 text-sm text-white/45">
+      목록에서 게시글을 선택하세요.
+    </GlassCard>
+  );
+
   return (
     <div className="mx-auto max-w-6xl px-container-padding-mobile py-10 md:px-8 md:py-14">
       <header className="mb-8 flex flex-col gap-5 border-b border-white/10 pb-8 lg:flex-row lg:items-end lg:justify-between">
@@ -271,7 +320,7 @@ export function QaBoardClient({ initialItems, initialOpenId = null }: Props) {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-        <div className="space-y-2 lg:hidden">
+        <div className={`space-y-2 lg:hidden ${mobileDetailOpen ? "hidden" : ""}`}>
           {filtered.length === 0 ? (
             <GlassCard className="p-8 text-center text-sm text-white/45">
               등록된 질문이 없습니다.
@@ -362,69 +411,9 @@ export function QaBoardClient({ initialItems, initialOpenId = null }: Props) {
           </div>
         </GlassCard>
 
-        <div
-          className={`space-y-4 ${
-            selected || loadingDetail
-              ? "fixed inset-0 z-40 overflow-y-auto bg-landing-bg px-4 pb-24 pt-3 lg:static lg:z-auto lg:overflow-visible lg:bg-transparent lg:p-0 lg:pb-0"
-              : "hidden lg:block"
-          }`}
-        >
-          {selected || loadingDetail ? (
-            <button
-              type="button"
-              onClick={() => setSelected(null)}
-              className="mb-2 inline-flex items-center gap-1 text-sm font-semibold text-[#6ee7b7] lg:hidden"
-            >
-              ← 목록으로
-            </button>
-          ) : null}
-          {loadingDetail ? (
-            <GlassCard className="flex h-48 items-center justify-center p-5 text-sm text-white/45">
-              불러오는 중…
-            </GlassCard>
-          ) : selected ? (
-            <GlassCard className="p-5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="rounded-full border border-white/15 px-2.5 py-0.5 text-[11px] font-bold text-white/60">
-                  {selected.category}
-                </span>
-                <StatusBadge status={selected.status} />
-              </div>
-              <h2 className="mt-3 text-base font-bold text-white">{selected.question}</h2>
-              <p className="mt-1 text-xs text-white/40">
-                {selected.authorMasked} · {formatQaDate(selected.createdAt)}
-              </p>
-              <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-white/75">
-                {selected.content}
-              </p>
-
-              {selected.answer ? (
-                <div className="mt-5 rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-4">
-                  <p className="text-xs font-bold text-emerald-300">
-                    전문가 답변{selected.answerer ? ` · ${selected.answerer}` : ""}
-                  </p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-white/85">{selected.answer}</p>
-                  <p className="mt-3 border-t border-white/10 pt-3 text-xs leading-relaxed text-white/50">
-                    {selected.answerFooter || ANSWER_FOOTER}
-                  </p>
-                  <Link
-                    href={consultHrefFromQaCategory(selected.category)}
-                    className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-[#6ee7b7] hover:underline"
-                  >
-                    방문/전화/출장 상담예약 →
-                  </Link>
-                </div>
-              ) : (
-                <p className="mt-5 text-sm text-white/45">아직 답변이 등록되지 않았습니다.</p>
-              )}
-            </GlassCard>
-          ) : (
-            <GlassCard className="flex h-48 items-center justify-center p-5 text-sm text-white/45">
-              목록에서 게시글을 선택하세요.
-            </GlassCard>
-          )}
-
-          <GlassCard className="hidden p-5 lg:block">
+        <div className="hidden space-y-4 lg:block">
+          {detailBody}
+          <GlassCard className="p-5">
             <p className="text-xs leading-relaxed text-white/60">
               찬스상담소는 부담 없는 소통 창구입니다. 더 정밀한 권리분석·현장 방문·대행이 필요하시면
               상담예약을 이용해 주세요.
@@ -438,6 +427,14 @@ export function QaBoardClient({ initialItems, initialOpenId = null }: Props) {
           </GlassCard>
         </div>
       </div>
+
+      <MobileBoardDetail
+        open={mobileDetailOpen}
+        onClose={() => setSelected(null)}
+        accentClassName="text-[#6ee7b7]"
+      >
+        {detailBody}
+      </MobileBoardDetail>
 
       {pwModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
