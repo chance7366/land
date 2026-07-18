@@ -46,7 +46,8 @@ npm install @supabase/supabase-js @supabase/ssr
 1. [Supabase Dashboard](https://supabase.com/dashboard) → 프로젝트 생성
 2. **SQL Editor** → New query
 3. 파일 내용 전체 붙여넣기 후 Run:  
-   [`supabase/migrations/001_init_chance.sql`](../supabase/migrations/001_init_chance.sql)
+   [`supabase/migrations/001_init_chance.sql`](../supabase/migrations/001_init_chance.sql)  
+   [`supabase/migrations/002_news_feed.sql`](../supabase/migrations/002_news_feed.sql)
 
 포함 테이블:
 - `properties` — 매물 (images jsonb)
@@ -54,7 +55,8 @@ npm install @supabase/supabase-js @supabase/ssr
 - `consultations` — 1:1 상담 예약
 - `legal_questions` — 찬스상담소 Q&A
 - `success_stories` — 성공스토리
-- `subscribers` — 알림 신청자  
+- `subscribers` — 알림 신청자
+- `news_feed_items` — 뉴스 피드  
 Storage 버킷: **`property-images`** (public)
 
 ### 2-4. 앱에서 Supabase 사용 켜기
@@ -69,12 +71,13 @@ SUPABASE_SERVICE_ROLE_KEY=eyJ...
 ```
 
 전환된 API/페이지:
-- 홈 `getLandingHomeData` (매물·경매·상담소·성공스토리)
+- 홈 `getLandingHomeData` (매물·경매·뉴스·상담소·성공스토리)
+- `/news`, `GET /api/news-feed`, 관리자 뉴스 수집/상태
 - `POST /api/consultations`, `POST /api/consultations/lookup`
 - `POST /api/subscriptions`
+- 관리자 매물·경매 CRUD
 
-`DATA_PROVIDER=prisma`(기본)이면 기존 로컬 SQLite 동작을 유지합니다.  
-뉴스 피드·관리자 CRUD 전체는 Prisma 경로를 아직 사용하므로, 완전 이관은 단계적으로 확장하면 됩니다.
+`DATA_PROVIDER=prisma`(기본)이면 기존 로컬 SQLite 동작을 유지합니다.
 
 ---
 

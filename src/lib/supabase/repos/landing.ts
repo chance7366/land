@@ -5,6 +5,7 @@ import {
   mapPropertyRow,
   mapStoryRow,
 } from "@/lib/supabase/mappers";
+import { getLandingNewsFromSupabase } from "@/lib/supabase/repos/news-feed";
 
 /** 홈 히어로 하단 — Supabase 조회 */
 export async function getLandingHomeDataFromSupabase() {
@@ -15,6 +16,7 @@ export async function getLandingHomeDataFromSupabase() {
     { data: auctions, error: aErr },
     { data: legalQuestions, error: lErr },
     { data: successStories, error: sErr },
+    newsFeed,
   ] = await Promise.all([
     sb
       .from("properties")
@@ -42,6 +44,10 @@ export async function getLandingHomeDataFromSupabase() {
       .eq("status", "PUBLISHED")
       .order("created_at", { ascending: false })
       .limit(5),
+    getLandingNewsFromSupabase().catch((e) => {
+      console.error("[landing] newsFeed", e);
+      return [];
+    }),
   ]);
 
   if (pErr) console.error("[landing] properties", pErr.message);
@@ -52,7 +58,7 @@ export async function getLandingHomeDataFromSupabase() {
   return {
     properties: (properties ?? []).map(mapPropertyRow),
     auctions: (auctions ?? []).map(mapAuctionRow),
-    newsFeed: [] as never[],
+    newsFeed,
     legalQuestions: (legalQuestions ?? []).map(mapLegalRow),
     successStories: (successStories ?? []).map(mapStoryRow),
   };

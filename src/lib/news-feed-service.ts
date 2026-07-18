@@ -9,9 +9,17 @@ import {
   newsFeedVisibleFrom,
 } from "@/lib/news-feed";
 import { collectAllSources, collectSelectedSources } from "@/lib/news-feed-collect";
+import { isSupabaseEnabled } from "@/lib/supabase/config";
 
 /** 출처별 보관기간 밖 행 삭제 — 네이버·r114 30일, 행정 출처 1년 */
 export async function pruneExpiredNewsFeedItems() {
+  if (isSupabaseEnabled()) {
+    const { pruneExpiredNewsFeedItemsSupabase } = await import(
+      "@/lib/supabase/repos/news-feed"
+    );
+    return pruneExpiredNewsFeedItemsSupabase();
+  }
+
   const naverCutoff = newsFeedNaverCutoff();
   const r114Cutoff = newsFeedR114Cutoff();
   const adminCutoff = newsFeedVisibleFrom();
@@ -39,6 +47,13 @@ export async function pruneExpiredNewsFeedItems() {
  * 수집(cron/admin) 경로에서만 호출.
  */
 export async function cleanupStaleNewsFeedItems() {
+  if (isSupabaseEnabled()) {
+    const { cleanupStaleNewsFeedItemsSupabase } = await import(
+      "@/lib/supabase/repos/news-feed"
+    );
+    return cleanupStaleNewsFeedItemsSupabase();
+  }
+
   const removed = {
     naverMismatch: 0,
     staleThumbs: 0,
@@ -138,15 +153,24 @@ export async function ensureNewsFeedConsistency() {
 }
 
 export async function upsertNewsFeedItems(items: CollectedNewsItem[]) {
+  const filtered = items.filter((item) => {
+    if (!isNewsFeedPubDateCollectable(item.pubDate, item.source)) return false;
+    const cutoff = newsFeedCutoffForSource(item.source);
+    return item.pubDate.getTime() >= cutoff.getTime();
+  });
+
+  if (isSupabaseEnabled()) {
+    const { upsertNewsFeedItemsSupabase } = await import(
+      "@/lib/supabase/repos/news-feed"
+    );
+    return upsertNewsFeedItemsSupabase(filtered);
+  }
+
   let created = 0;
   let updated = 0;
   const failed: { originUrl: string; error: string }[] = [];
 
-  for (const item of items) {
-    if (!isNewsFeedPubDateCollectable(item.pubDate, item.source)) continue;
-    const cutoff = newsFeedCutoffForSource(item.source);
-    if (item.pubDate.getTime() < cutoff.getTime()) continue;
-
+  for (const item of filtered) {
     try {
       const existing = await prisma.newsFeedItem.findUnique({
         where: { originUrl: item.originUrl },

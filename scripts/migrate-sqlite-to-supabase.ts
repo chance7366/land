@@ -46,7 +46,7 @@ function parseJsonObject(raw: string | null | undefined): Record<string, unknown
 }
 
 async function upsertBatched(
-  sb: ReturnType<typeof createClient>,
+  sb: ReturnType<typeof createClient<any>>,
   table: string,
   rows: Record<string, unknown>[],
   onConflict: string,
@@ -55,7 +55,7 @@ async function upsertBatched(
   let ok = 0;
   for (let i = 0; i < rows.length; i += chunk) {
     const part = rows.slice(i, i + chunk);
-    const { error } = await sb.from(table).upsert(part, { onConflict });
+    const { error } = await sb.from(table).upsert(part as never[], { onConflict });
     if (error) throw new Error(`${table}: ${error.message}`);
     ok += part.length;
   }
@@ -76,15 +76,23 @@ async function main() {
   const prisma = new PrismaClient();
 
   try {
-    const [properties, auctions, consultations, legalQuestions, stories, subscribers] =
-      await Promise.all([
-        prisma.property.findMany(),
-        prisma.auction.findMany(),
-        prisma.consultation.findMany(),
-        prisma.legalQuestion.findMany(),
-        prisma.successStory.findMany(),
-        prisma.emailSubscriber.findMany(),
-      ]);
+    const [
+      properties,
+      auctions,
+      consultations,
+      legalQuestions,
+      stories,
+      subscribers,
+      newsItems,
+    ] = await Promise.all([
+      prisma.property.findMany(),
+      prisma.auction.findMany(),
+      prisma.consultation.findMany(),
+      prisma.legalQuestion.findMany(),
+      prisma.successStory.findMany(),
+      prisma.emailSubscriber.findMany(),
+      prisma.newsFeedItem.findMany(),
+    ]);
 
     console.log("로컬 건수:", {
       properties: properties.length,
@@ -93,6 +101,7 @@ async function main() {
       legalQuestions: legalQuestions.length,
       stories: stories.length,
       subscribers: subscribers.length,
+      newsItems: newsItems.length,
     });
 
     const propertyRows = properties.map((p) => ({
@@ -214,6 +223,22 @@ async function main() {
       updated_at: s.updatedAt.toISOString(),
     }));
 
+    const newsRows = newsItems.map((r) => ({
+      id: r.id,
+      source: r.source,
+      source_name: r.sourceName,
+      title: r.title,
+      summary: r.summary ?? "",
+      press: r.press ?? "",
+      origin_url: r.originUrl,
+      image_url: r.imageUrl,
+      rank: r.rank,
+      pub_date: r.pubDate.toISOString(),
+      fetched_at: r.fetchedAt.toISOString(),
+      created_at: r.createdAt.toISOString(),
+      updated_at: r.updatedAt.toISOString(),
+    }));
+
     const result = {
       properties: propertyRows.length
         ? await upsertBatched(sb, "properties", propertyRows, "manage_code")
@@ -233,10 +258,30 @@ async function main() {
       subscribers: subscriberRows.length
         ? await upsertBatched(sb, "subscribers", subscriberRows, "id")
         : 0,
+      news_feed_items: 0,
     };
 
+    if (newsRows.length) {
+      const { error: newsProbe } = await sb
+        .from("news_feed_items")
+        .select("id")
+        .limit(1);
+      if (newsProbe) {
+        console.warn(
+          "news_feed_items 테이블 없음 — supabase/migrations/002_news_feed.sql 을 SQL Editor에서 Run 한 뒤 다시 실행하세요.",
+          newsProbe.message,
+        );
+      } else {
+        result.news_feed_items = await upsertBatched(
+          sb,
+          "news_feed_items",
+          newsRows,
+          "origin_url",
+        );
+      }
+    }
+
     console.log("Supabase 이관 완료:", result);
-    console.log("※ 뉴스 피드(news_feed)는 Supabase 스키마에 없어 제외되었습니다.");
   } finally {
     await prisma.$disconnect();
   }

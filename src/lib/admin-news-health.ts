@@ -8,6 +8,7 @@ import {
   type NewsFeedSourceId,
 } from "@/lib/news-feed";
 import { prisma } from "@/lib/prisma";
+import { isSupabaseEnabled } from "@/lib/supabase/config";
 
 export type SourceHealthStatus = "ok" | "warn" | "fail";
 
@@ -106,6 +107,26 @@ function emptyRow(source: NewsFeedSourceId): AdminNewsHealthRow {
 
 /** DB 기준 출처별 수집 상태 (기사 본문 없음) */
 export async function loadAdminNewsHealthRows(): Promise<AdminNewsHealthRow[]> {
+  if (isSupabaseEnabled()) {
+    const { loadAdminNewsHealthFromSupabase } = await import(
+      "@/lib/supabase/repos/news-feed"
+    );
+    const bySource = await loadAdminNewsHealthFromSupabase();
+    return NEWS_FEED_SOURCES.map((s) => {
+      const base = emptyRow(s.key);
+      const hit = bySource.get(s.key);
+      if (!hit) return base;
+      return {
+        ...base,
+        itemCount: hit.count,
+        lastFetchedAt: hit.lastFetchedAt?.toISOString() ?? null,
+        latestPubDate: hit.latestPubDate
+          ? hit.latestPubDate.toISOString().slice(0, 10)
+          : null,
+      };
+    });
+  }
+
   const grouped = await prisma.newsFeedItem.groupBy({
     by: ["source"],
     where: newsFeedVisibleWhere("all"),

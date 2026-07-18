@@ -16,6 +16,8 @@
     "db:studio": "node ./node_modules/prisma/build/index.js studio",
     "collect:news": "node ./node_modules/tsx/dist/cli.mjs scripts/collect-news-feed.ts",
     "collect:news:cron": "node ./node_modules/tsx/dist/cli.mjs scripts/news-feed-scheduler.ts",
+    "migrate:news-supabase": "node ./node_modules/tsx/dist/cli.mjs scripts/apply-sql-and-migrate-news.ts",
+    "migrate:sqlite-supabase": "node ./node_modules/tsx/dist/cli.mjs scripts/migrate-sqlite-to-supabase.ts",
     "collect:news:task": "powershell -ExecutionPolicy Bypass -File ./scripts/run-news-feed-collect.ps1",
     "collect:news:register": "powershell -ExecutionPolicy Bypass -File ./scripts/register-news-feed-tasks.ps1"
   },

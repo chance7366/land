@@ -15,11 +15,13 @@ import {
   newsFeedGroupForSource,
   newsFeedVisibleWhere,
   sortGroupAllByDateThenRandom,
+  titleMatchesKeywords,
   type NewsFeedGroupId,
   type NewsFeedSourceKey,
 } from "@/lib/news-feed";
 import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
+import { isSupabaseEnabled } from "@/lib/supabase/config";
 
 export const metadata: Metadata = {
   title: "부동산·지역소식 | 찬스부동산 경매중개",
@@ -65,6 +67,21 @@ export default async function NewsPage({ searchParams }: { searchParams: SearchP
   const initial = await withDbFallback(
     "news-page",
     async () => {
+      if (isSupabaseEnabled()) {
+        const { getNewsFeedListPayloadFromSupabase } = await import(
+          "@/lib/supabase/repos/news-feed"
+        );
+        return getNewsFeedListPayloadFromSupabase({
+          source: initialSource,
+          group: initialGroup,
+          page: 1,
+          pageSize: NEWS_FEED_PAGE_SIZE,
+          formatDate: formatNewsFeedDate,
+          titleMatches: titleMatchesKeywords,
+          sortGroupAll: sortGroupAllByDateThenRandom,
+        });
+      }
+
       const [allRows, grouped] = await Promise.all([
         prisma.newsFeedItem.findMany({
           where,

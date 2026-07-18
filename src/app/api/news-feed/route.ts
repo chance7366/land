@@ -17,6 +17,7 @@ import {
   titleMatchesKeywords,
   type NewsFeedGroupId,
 } from "@/lib/news-feed";
+import { isSupabaseEnabled } from "@/lib/supabase/config";
 
 export async function GET(request: NextRequest) {
   try {
@@ -48,14 +49,39 @@ export async function GET(request: NextRequest) {
       group = newsFeedGroupForSource(sourceKey);
     }
 
-    const sourceFilter = newsFeedVisibleWhere(sourceKey, new Date(), group);
-
     const r114Category =
       sourceKey === "r114" &&
       categoryParam !== "all" &&
       isR114WikiCategoryId(categoryParam)
         ? categoryParam
         : null;
+
+    if (isSupabaseEnabled()) {
+      const { getNewsFeedListPayloadFromSupabase } = await import(
+        "@/lib/supabase/repos/news-feed"
+      );
+      const payload = await getNewsFeedListPayloadFromSupabase({
+        source: sourceKey,
+        group,
+        page,
+        pageSize,
+        keywords,
+        r114Category,
+        r114CategoryLabel: r114Category
+          ? getR114WikiCategoryMeta(r114Category).label
+          : null,
+        formatDate: formatNewsFeedDate,
+        titleMatches: titleMatchesKeywords,
+        sortGroupAll: sortGroupAllByDateThenRandom,
+      });
+      return NextResponse.json({
+        ...payload,
+        keywords,
+        category: r114Category ?? "all",
+      });
+    }
+
+    const sourceFilter = newsFeedVisibleWhere(sourceKey, new Date(), group);
 
     const where =
       r114Category != null
@@ -104,7 +130,6 @@ export async function GET(request: NextRequest) {
         )
       : allMatching;
 
-    // 그룹 전체: 등록일 최신순 + 동일일은 랜덤 (출처 순 고정 방지)
     const ordered =
       sourceKey === "all"
         ? sortGroupAllByDateThenRandom(filtered, Date.now())

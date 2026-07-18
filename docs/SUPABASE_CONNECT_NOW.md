@@ -21,10 +21,11 @@
 1. 좌측 **SQL Editor** → **New query**  
 2. 아래 파일 내용을 **전부 복사 → 붙여넣기 → Run**  
    - [`supabase/migrations/001_init_chance.sql`](../supabase/migrations/001_init_chance.sql)  
+   - [`supabase/migrations/002_news_feed.sql`](../supabase/migrations/002_news_feed.sql)  
 3. (선택) 데모 매물/경매가 바로 보이게:  
    - [`supabase/seed_demo.sql`](../supabase/seed_demo.sql) 도 동일하게 Run  
 
-Table Editor에 `properties`, `auctions` 등이 보이면 성공입니다.
+Table Editor에 `properties`, `auctions`, `news_feed_items` 등이 보이면 성공입니다.
 
 ---
 
