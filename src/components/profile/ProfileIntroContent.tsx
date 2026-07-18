@@ -118,9 +118,9 @@ export function ProfileIntroContent() {
     <main className="relative z-10 mx-auto max-w-6xl px-container-padding-mobile py-10 md:px-8 md:py-14">
       <section className="mb-14 grid items-center gap-10 md:grid-cols-[auto_1fr] md:gap-12">
         <TrustPortrait />
-        <div>
+        <div className="text-center md:text-left">
           <p className="text-xs font-bold tracking-wide text-[#f9a8d4]">PROFILE</p>
-          <h1 className="mt-2 font-[family-name:var(--font-unifine)] text-3xl font-extrabold tracking-tight text-white md:text-4xl">
+          <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-white md:text-4xl font-[family-name:var(--font-unifine)]">
             김영찬 공인중개사
           </h1>
           <p className="mt-4 text-base font-semibold leading-relaxed text-[#fde68a] md:text-lg">

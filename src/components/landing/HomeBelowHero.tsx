@@ -124,6 +124,7 @@ function HomeFeaturedSection({
               전체 →
             </Link>
           </div>
+          <p className="mb-1.5 text-center text-[10px] text-white/35 md:hidden">좌우로 넘겨 보세요</p>
           {properties.length === 0 ? (
             <p className="text-xs text-white/40">등록된 매물이 없습니다.</p>
           ) : (
@@ -144,6 +145,7 @@ function HomeFeaturedSection({
               전체 →
             </Link>
           </div>
+          <p className="mb-1.5 text-center text-[10px] text-white/35 md:hidden">좌우로 넘겨 보세요</p>
           {auctions.length === 0 ? (
             <p className="text-xs text-white/40">등록된 경매가 없습니다.</p>
           ) : (

@@ -196,7 +196,7 @@ export function QaBoardClient({ initialItems, initialOpenId = null }: Props) {
     <div className="mx-auto max-w-6xl px-container-padding-mobile py-10 md:px-8 md:py-14">
       <header className="mb-8 flex flex-col gap-5 border-b border-white/10 pb-8 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-2xl">
-          <h1 className="text-3xl font-extrabold text-white md:text-4xl">찬스상담소</h1>
+          <h1 className="text-2xl font-extrabold text-white md:text-4xl">찬스상담소</h1>
           <p className="mt-3 text-sm leading-relaxed text-white/65">
             부동산 중개·경매·세무·법률 등 궁금하신 점을 편하게 남겨주시면 전문가가 명쾌하게
             답변해 드립니다.
@@ -247,7 +247,42 @@ export function QaBoardClient({ initialItems, initialOpenId = null }: Props) {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-        <GlassCard className="overflow-hidden p-0">
+        <div className="space-y-2 lg:hidden">
+          {filtered.length === 0 ? (
+            <GlassCard className="p-8 text-center text-sm text-white/45">
+              등록된 질문이 없습니다.
+            </GlassCard>
+          ) : (
+            filtered.map((post) => (
+              <button
+                key={post.id}
+                type="button"
+                onClick={() => void openPost(post)}
+                className={`w-full rounded-2xl border px-4 py-3.5 text-left transition ${
+                  selected?.id === post.id
+                    ? "border-[#34d399]/45 bg-[#34d399]/10"
+                    : "border-white/10 bg-white/[0.04] hover:border-white/20"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-white/50">{post.category}</span>
+                  <StatusBadge status={post.status} />
+                </div>
+                <p className="mt-1.5 flex items-start gap-1.5 text-sm font-bold text-white">
+                  {post.isSecret ? (
+                    <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-white/50" aria-hidden />
+                  ) : null}
+                  <span className="line-clamp-2">{post.question}</span>
+                </p>
+                <p className="mt-2 text-[11px] text-white/40">
+                  {post.authorMasked} · {formatQaDate(post.createdAt)}
+                </p>
+              </button>
+            ))
+          )}
+        </div>
+
+        <GlassCard className="hidden overflow-hidden p-0 lg:block">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="bg-white/5 text-xs text-white/45">
@@ -303,7 +338,22 @@ export function QaBoardClient({ initialItems, initialOpenId = null }: Props) {
           </div>
         </GlassCard>
 
-        <div className="space-y-4">
+        <div
+          className={`space-y-4 ${
+            selected || loadingDetail
+              ? "fixed inset-0 z-40 overflow-y-auto bg-landing-bg px-4 pb-24 pt-3 lg:static lg:z-auto lg:overflow-visible lg:bg-transparent lg:p-0 lg:pb-0"
+              : "hidden lg:block"
+          }`}
+        >
+          {selected || loadingDetail ? (
+            <button
+              type="button"
+              onClick={() => setSelected(null)}
+              className="mb-2 inline-flex items-center gap-1 text-sm font-semibold text-[#6ee7b7] lg:hidden"
+            >
+              ← 목록으로
+            </button>
+          ) : null}
           {loadingDetail ? (
             <GlassCard className="flex h-48 items-center justify-center p-5 text-sm text-white/45">
               불러오는 중…
@@ -350,7 +400,7 @@ export function QaBoardClient({ initialItems, initialOpenId = null }: Props) {
             </GlassCard>
           )}
 
-          <GlassCard className="p-5">
+          <GlassCard className="hidden p-5 lg:block">
             <p className="text-xs leading-relaxed text-white/60">
               찬스상담소는 부담 없는 소통 창구입니다. 더 정밀한 권리분석·현장 방문·대행이 필요하시면
               상담예약을 이용해 주세요.

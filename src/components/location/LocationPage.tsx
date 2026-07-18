@@ -51,7 +51,7 @@ export function LocationPage() {
       </header>
 
       <GlassCard className="overflow-hidden p-0">
-        <div className="relative aspect-[16/9] w-full bg-black/40 md:aspect-[21/9]">
+        <div className="relative h-[300px] w-full bg-black/40 md:h-auto md:aspect-[21/9]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={LOCATION_IMAGES.map}

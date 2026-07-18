@@ -71,7 +71,7 @@ export function HeroServiceCards() {
   return (
     <div
       ref={areaRef}
-      className="relative isolate grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+      className="relative isolate grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"
       onMouseLeave={() => setActiveKey(null)}
     >
       {ripples.map((r) => (

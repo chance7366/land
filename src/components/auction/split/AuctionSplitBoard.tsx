@@ -67,6 +67,14 @@ export function AuctionSplitBoard({ items, initialId = null, totalCount }: Props
 
   const selected = visible.find((a) => a.id === selectedId) ?? null;
 
+  function syncIdToUrl(id: string | null) {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (id) url.searchParams.set("id", id);
+    else url.searchParams.delete("id");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+  }
+
   function selectAuction(id: string) {
     setSelectedId(id);
     setMobileDetail(true);
@@ -76,11 +84,12 @@ export function AuctionSplitBoard({ items, initialId = null, totalCount }: Props
       targetType: "auction",
       targetId: id,
     });
-    if (typeof window !== "undefined") {
-      const url = new URL(window.location.href);
-      url.searchParams.set("id", id);
-      window.history.replaceState(null, "", `${url.pathname}${url.search}`);
-    }
+    syncIdToUrl(id);
+  }
+
+  function backToList() {
+    setMobileDetail(false);
+    syncIdToUrl(null);
   }
 
   useEffect(() => {
@@ -150,11 +159,17 @@ export function AuctionSplitBoard({ items, initialId = null, totalCount }: Props
             </div>
           </div>
 
-          <div className={`${mobileDetail ? "block" : "hidden lg:block"}`}>
+          <div
+            className={`${
+              mobileDetail
+                ? "fixed inset-0 z-40 overflow-y-auto bg-landing-bg px-4 pb-24 pt-3 md:px-6 lg:static lg:z-auto lg:overflow-visible lg:bg-transparent lg:p-0 lg:pb-0"
+                : "hidden lg:block"
+            }`}
+          >
             <AuctionSplitDetail
               auction={selected}
               showBack={mobileDetail}
-              onBack={() => setMobileDetail(false)}
+              onBack={backToList}
             />
           </div>
         </div>

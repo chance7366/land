@@ -45,7 +45,7 @@ export function LandingNav() {
   return (
     <nav
       aria-label="서비스 메뉴"
-      className="relative z-30 border-b border-landing-border bg-landing-bg"
+      className="relative z-30 hidden border-b border-landing-border bg-landing-bg md:block"
     >
       <ul className="mx-auto flex max-w-6xl items-stretch justify-start gap-0 overflow-x-auto overscroll-x-contain px-container-padding-mobile [-ms-overflow-style:none] [scrollbar-width:none] md:justify-center md:gap-2 md:overflow-visible md:px-8 [&::-webkit-scrollbar]:hidden">
         {items.map((item) => {

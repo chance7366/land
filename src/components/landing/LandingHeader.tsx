@@ -3,6 +3,7 @@ import { AppLink as Link } from "@/components/ui/AppLink";
 import { AlertSubscribeHeaderButton } from "@/components/landing/AlertSubscribeHeaderButton";
 import { ChannelShortcuts } from "@/components/landing/ChannelShortcuts";
 import { ConsultHeaderButton } from "@/components/landing/ConsultHeaderButton";
+import { LandingHeaderMenuButton } from "@/components/landing/LandingHeaderMenuButton";
 
 function HeaderTooltip({
   label,
@@ -53,9 +54,12 @@ export function LandingHeader() {
           </HeaderTooltip>
         </div>
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-          <AlertSubscribeHeaderButton />
-          <ConsultHeaderButton />
-          <ChannelShortcuts />
+          <div className="hidden items-center gap-1.5 sm:gap-2 md:flex">
+            <AlertSubscribeHeaderButton />
+            <ConsultHeaderButton />
+            <ChannelShortcuts />
+          </div>
+          <LandingHeaderMenuButton />
         </div>
       </div>
     </header>

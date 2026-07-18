@@ -6,6 +6,7 @@ import { LandingHero } from "@/components/landing/LandingHero";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingShell } from "@/components/landing/LandingShell";
 import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
+import { UserBottomNav } from "@/components/user/UserShell";
 
 export { dynamic } from "@/lib/page-config";
 
@@ -27,7 +28,10 @@ export default async function HomePage() {
           successStories={data.successStories}
         />
       </main>
-      <LandingFooter />
+      <div className="pb-24 md:pb-0">
+        <LandingFooter />
+      </div>
+      <UserBottomNav />
     </LandingShell>
   );
 }

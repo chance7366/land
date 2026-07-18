@@ -79,6 +79,15 @@ export function PropertySplitBoard({ items, initialId = null, totalCount, filter
 
   const selected = visible.find((p) => p.id === selectedId) ?? null;
 
+  function syncIdToUrl(id: string | null) {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (id) url.searchParams.set("id", id);
+    else url.searchParams.delete("id");
+    const next = `${url.pathname}${url.search}`;
+    window.history.replaceState(null, "", next);
+  }
+
   function selectProperty(id: string) {
     setSelectedId(id);
     setMobileDetail(true);
@@ -88,11 +97,12 @@ export function PropertySplitBoard({ items, initialId = null, totalCount, filter
       targetType: "property",
       targetId: id,
     });
-    if (typeof window !== "undefined") {
-      const url = new URL(window.location.href);
-      url.searchParams.set("id", id);
-      window.history.replaceState(null, "", `${url.pathname}${url.search}`);
-    }
+    syncIdToUrl(id);
+  }
+
+  function backToList() {
+    setMobileDetail(false);
+    syncIdToUrl(null);
   }
 
   useEffect(() => {
@@ -168,11 +178,17 @@ export function PropertySplitBoard({ items, initialId = null, totalCount, filter
             </div>
           </div>
 
-          <div className={`${mobileDetail ? "block" : "hidden lg:block"}`}>
+          <div
+            className={`${
+              mobileDetail
+                ? "fixed inset-0 z-40 overflow-y-auto bg-landing-bg px-4 pb-24 pt-3 md:px-6 lg:static lg:z-auto lg:overflow-visible lg:bg-transparent lg:p-0 lg:pb-0"
+                : "hidden lg:block"
+            }`}
+          >
             <PropertySplitDetail
               property={selected}
               showBack={mobileDetail}
-              onBack={() => setMobileDetail(false)}
+              onBack={backToList}
             />
           </div>
         </div>
