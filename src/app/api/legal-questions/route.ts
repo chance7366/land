@@ -12,7 +12,7 @@ export async function GET() {
     const items = isSupabaseEnabled()
       ? await listLegalQuestionsFromSupabase(100)
       : await prisma.legalQuestion.findMany({
-          where: { isPublic: true },
+          where: { OR: [{ isPublic: true }, { isSecret: true }] },
           orderBy: { createdAt: "desc" },
           take: 100,
         });

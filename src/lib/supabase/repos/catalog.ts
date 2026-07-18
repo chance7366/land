@@ -94,12 +94,13 @@ export async function listAuctionsFromSupabase() {
   return (data ?? []).map(mapAuctionRow);
 }
 
+/** 찬스상담소 게시판 목록 — 공개글 + 비밀글(자물쇠). 홈 미리보기는 landing 쪽에서 is_public만 사용 */
 export async function listLegalQuestionsFromSupabase(take = 100) {
   const sb = createSupabaseDataClient();
   const { data, error } = await sb
     .from("legal_questions")
     .select("*")
-    .eq("is_public", true)
+    .or("is_public.eq.true,is_secret.eq.true")
     .order("created_at", { ascending: false })
     .limit(take);
   if (error) throw error;

@@ -11,6 +11,7 @@ import {
   QA_STATUS_META,
   consultHrefFromQaCategory,
   formatQaDate,
+  maskAuthor,
 } from "@/lib/qa";
 
 const fieldClass =
@@ -163,6 +164,21 @@ export function QaBoardClient({ initialItems, initialOpenId = null }: Props) {
       if (listRes.ok) {
         const list = (await listRes.json()) as QaListItem[];
         setPosts(list);
+      } else {
+        // 목록 갱신 실패 시에도 방금 등록한 글은 목록에 반영
+        setPosts((prev) => [
+          {
+            id: data.id,
+            category: data.category,
+            question: data.question,
+            authorMasked: maskAuthor(form.author.trim() || "익명"),
+            isSecret: Boolean(data.isSecret),
+            status: data.status,
+            createdAt: new Date().toISOString(),
+            hasAnswer: false,
+          },
+          ...prev.filter((p) => p.id !== data.id),
+        ]);
       }
 
       const unlockCode = form.isSecret ? form.password : undefined;
