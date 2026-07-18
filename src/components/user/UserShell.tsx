@@ -6,13 +6,16 @@ import { useRef } from "react";
 import { ChannelShortcuts } from "@/components/landing/ChannelShortcuts";
 import { ConsultHeaderButton } from "@/components/landing/ConsultHeaderButton";
 
-/** 모바일 하단 고정 — 엄지 영역 5탭 (나머지 메뉴는 햄버거 Sheet) */
+/** 모바일 하단 고정 — 1열 가로 스크롤 (터치로 밀기) */
 const NAV_ITEMS = [
   { label: "홈", icon: "home", href: "/" },
   { label: "부동산중개", icon: "apartment", href: "/properties" },
   { label: "경매공매", icon: "gavel", href: "/auctions" },
+  { label: "부동산·지역소식", icon: "newspaper", href: "/news" },
   { label: "찬스상담소", icon: "balance", href: "/legal" },
+  { label: "성공스토리", icon: "star", href: "/success-stories" },
   { label: "프로필", icon: "person", href: "/profile" },
+  { label: "찾아오시는 길", icon: "location_on", href: "/location" },
 ];
 
 function MaterialIcon({
@@ -87,7 +90,7 @@ export function UserBottomNav() {
       aria-label="모바일 서비스 메뉴"
       className="fixed bottom-0 left-0 z-50 w-full border-t border-white/10 bg-landing-bg/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
     >
-      <div className="mx-auto flex max-w-lg items-stretch justify-between px-1 py-1.5">
+      <div className="flex items-stretch gap-0 overflow-x-auto overscroll-x-contain px-1 py-1.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {NAV_ITEMS.map((item) => {
           const active =
             item.href === "/"
@@ -97,13 +100,13 @@ export function UserBottomNav() {
             <Link
               key={item.label}
               href={item.href}
-              className={`flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 py-1 transition-colors ${
+              className={`flex min-h-12 min-w-[4.5rem] shrink-0 flex-col items-center justify-center gap-0.5 px-1.5 py-1 transition-colors ${
                 active ? "text-blue-400" : "text-landing-muted hover:text-landing-text"
               }`}
             >
               <MaterialIcon name={item.icon} filled={active} className="text-[22px]" />
               <span
-                className={`max-w-full truncate text-center text-[10px] leading-tight ${
+                className={`max-w-[4.25rem] truncate text-center text-[9px] leading-tight ${
                   active ? "font-bold" : "font-medium"
                 }`}
               >
