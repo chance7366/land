@@ -95,6 +95,12 @@ export function mapAuctionRow(row: Record<string, unknown>) {
     creditor: (row.creditor as string | null) ?? null,
     attachments: JSON.stringify(row.attachments ?? []),
     rightsAnalysis: (row.rights_analysis as string | null) ?? null,
+    caseDetailJson:
+      row.case_detail_json == null
+        ? null
+        : typeof row.case_detail_json === "string"
+          ? row.case_detail_json
+          : JSON.stringify(row.case_detail_json),
     memo: (row.memo as string | null) ?? null,
     winningPrice: row.winning_price == null ? null : Number(row.winning_price),
     winningRatio: row.winning_ratio == null ? null : Number(row.winning_ratio),

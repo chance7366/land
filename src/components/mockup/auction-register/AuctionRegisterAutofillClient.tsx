@@ -19,15 +19,21 @@ import {
   type CourtAuctionFixture,
   type DocSlot,
   type FormGroup,
+  type StatusReport,
   COURT_OPTIONS,
   findFixturesByCase,
   formatWon,
   groupLabel,
   listCasePresets,
 } from "@/lib/mockup/auction-court-fixtures";
+import {
+  StatusReportSection,
+  emptyStatusReport,
+} from "@/components/auction/StatusReportSection";
 
 type FormState = {
   court: string;
+  caseYear: string;
   caseSerial: string;
   caseNumber: string;
   itemNo: number;
@@ -65,7 +71,8 @@ type FormState = {
 };
 
 const emptyForm = (): FormState => ({
-  court: "대구지방법원",
+  court: "홍성지원",
+  caseYear: "2026",
   caseSerial: "",
   caseNumber: "",
   itemNo: 1,
@@ -105,6 +112,7 @@ const emptyForm = (): FormState => ({
 function fixtureToForm(f: CourtAuctionFixture): FormState {
   return {
     court: f.court,
+    caseYear: f.caseYear,
     caseSerial: f.caseSerial,
     caseNumber: f.caseNumber,
     itemNo: f.itemNo,
@@ -152,6 +160,7 @@ export function AuctionRegisterAutofillClient() {
   const [schedule, setSchedule] = useState<CourtAuctionFixture["schedule"]>([]);
   const [docs, setDocs] = useState<DocSlot[]>([]);
   const [photos, setPhotos] = useState<string[]>([]);
+  const [statusReport, setStatusReport] = useState<StatusReport>(emptyStatusReport);
   const [autoKeys, setAutoKeys] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState("");
@@ -176,11 +185,20 @@ export function AuctionRegisterAutofillClient() {
     setParcels(f.parcels);
     setSchedule(f.schedule);
     setDocs(f.documents.map((d) => ({ ...d })));
+    setStatusReport(
+      f.statusReport
+        ? {
+            ...f.statusReport,
+            leases: f.statusReport.leases.map((l) => ({ ...l })),
+          }
+        : emptyStatusReport(),
+    );
     setItemChoices(null);
     setFilled(true);
     setAutoKeys(
       new Set([
         "court",
+        "caseYear",
         "caseNumber",
         "itemNo",
         "formGroup",
@@ -209,9 +227,13 @@ export function AuctionRegisterAutofillClient() {
         "possessionNote",
         "leaseNote",
         "assumeRightsNote",
+        "statusReport",
       ]),
     );
-    setToast(`${f.caseNumber} 물건 ${f.itemNo} · ${groupLabel(f.formGroup)} 자동입력 완료`);
+    const statusHint = f.statusReport?.available ? " · 현황조사서 포함" : "";
+    setToast(
+      `${f.caseNumber} 물건 ${f.itemNo} · ${groupLabel(f.formGroup)} 자동입력 완료${statusHint}`,
+    );
   }
 
   async function handleFetch(serialOverride?: string) {
@@ -244,6 +266,7 @@ export function AuctionRegisterAutofillClient() {
     setParcels([]);
     setSchedule([]);
     setDocs([]);
+    setStatusReport(emptyStatusReport());
     setPhotos((prev) => {
       prev.forEach((u) => URL.revokeObjectURL(u));
       return [];
@@ -279,8 +302,10 @@ export function AuctionRegisterAutofillClient() {
           경매물건 등록
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-slate-400">
-          관할법원·사건번호로 법원경매 데이터를 불러오는 UX 샘플입니다. 실사이트 호출 없이 검증된 픽스처로
-          채우며, 유형(UNIT/HOUSE/LAND)에 따라 상세 섹션이 달라집니다.
+          관할법원·사건번호로 법원경매 데이터를 불러오는 UX 샘플입니다. 4번 섹션은 법원 현황조사서
+          팝업 서식을 따릅니다.{" "}
+          <span className="text-emerald-300/90">홍성지원 · 2026타경15044</span> 로 불러오면 첨부
+          이미지와 동일한 데이터가 채워집니다.
         </p>
       </header>
 
@@ -315,14 +340,21 @@ export function AuctionRegisterAutofillClient() {
             <label className="block text-xs text-slate-400">
               연도 · 타경 번호
               <div className="mt-1 flex gap-2">
-                <span className="flex items-center rounded-xl border border-white/10 bg-black/20 px-3 text-sm text-slate-300">
-                  2025타경
+                <input
+                  className={`${inputClass} w-20`}
+                  value={form.caseYear}
+                  onChange={(e) => setField("caseYear", e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  placeholder="2026"
+                  inputMode="numeric"
+                />
+                <span className="flex items-center rounded-xl border border-white/10 bg-black/20 px-2 text-sm text-slate-300">
+                  타경
                 </span>
                 <input
                   className={inputClass}
                   value={form.caseSerial}
                   onChange={(e) => setField("caseSerial", e.target.value.replace(/\D/g, ""))}
-                  placeholder="844"
+                  placeholder="15044"
                   inputMode="numeric"
                 />
               </div>
@@ -335,20 +367,28 @@ export function AuctionRegisterAutofillClient() {
                 onChange={(e) => {
                   const v = e.target.value;
                   if (!v) return;
-                  const [court, serial] = v.split("|");
-                  setForm((prev) => ({ ...prev, court, caseSerial: serial }));
+                  const [court, year, serial] = v.split("|");
+                  setForm((prev) => ({
+                    ...prev,
+                    court,
+                    caseYear: year,
+                    caseSerial: serial,
+                  }));
                   void handleFetch(serial);
                 }}
               >
                 <option value="">사건 고르기…</option>
                 {presets.map((p) => (
-                  <option key={p.caseSerial} value={`${p.court}|${p.caseSerial}`}>
+                  <option
+                    key={`${p.court}-${p.caseYear}-${p.caseSerial}`}
+                    value={`${p.court}|${p.caseYear}|${p.caseSerial}`}
+                  >
                     {p.label}
                   </option>
                 ))}
               </select>
             </label>
-            <div className="flex items-end">
+            <div className="flex items-end gap-2">
               <button
                 type="button"
                 disabled={loading || !form.caseSerial}
@@ -360,6 +400,22 @@ export function AuctionRegisterAutofillClient() {
               </button>
             </div>
           </div>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => {
+              setForm((prev) => ({
+                ...prev,
+                court: "홍성지원",
+                caseYear: "2026",
+                caseSerial: "15044",
+              }));
+              void handleFetch("15044");
+            }}
+            className="relative z-10 mt-3 text-left text-xs text-[#d4bfff] underline-offset-2 hover:underline"
+          >
+            → 현황조사서 데모: 홍성지원 2026타경15044 바로 불러오기
+          </button>
 
           {itemChoices && (
             <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-400/10 p-4">
@@ -384,16 +440,20 @@ export function AuctionRegisterAutofillClient() {
 
       {/* Progress chips */}
       <div className="mt-6 flex flex-wrap gap-2 text-[11px]">
-        {["기본", "가격·기일", "물건상세", "감정요약", "서류", "사진", "찬스의견"].map((label, i) => (
+        {["기본", "가격·기일", "물건상세", "현황조사서", "감정요약", "서류", "사진", "찬스의견"].map(
+          (label, i) => (
           <span
             key={label}
             className={`rounded-full border px-2.5 py-1 ${
-              filled ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200" : "border-white/10 text-slate-500"
+              filled && (label !== "현황조사서" || statusReport.available)
+                ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
+                : "border-white/10 text-slate-500"
             }`}
           >
             {i + 1}. {label}
           </span>
-        ))}
+          ),
+        )}
         {form.formGroup && (
           <span className="rounded-full border border-[#913dff]/40 bg-[#913dff]/15 px-2.5 py-1 font-semibold text-[#d4bfff]">
             {form.formGroup} · {groupLabel(form.formGroup as FormGroup)}
@@ -696,18 +756,37 @@ export function AuctionRegisterAutofillClient() {
           </div>
         </Section>
 
-        {/* 4 Appraisal summary */}
-        <Section n={4} title="감정요약">
+        {/* 4 Status report (court 현황조사서 form) */}
+        <StatusReportSection
+          n={4}
+          report={statusReport}
+          autoFilled={autoKeys.has("statusReport")}
+          onChange={(next) => {
+            setStatusReport(next);
+            setAutoKeys((prev) => {
+              if (!prev.has("statusReport")) return prev;
+              const nset = new Set(prev);
+              nset.delete("statusReport");
+              return nset;
+            });
+          }}
+        />
+
+        {/* 5 Appraisal summary */}
+        <Section n={5} title="감정요약" hint="법원 감정평가요항표 원문 · 글자 수 제한 없음">
           <textarea
-            className={`${cls("appraisalSummary")} min-h-[120px]`}
+            className={`${cls("appraisalSummary")} min-h-[280px] whitespace-pre-wrap`}
             value={form.appraisalSummary}
             onChange={(e) => setField("appraisalSummary", e.target.value)}
-            placeholder="위치·교통·구조·용도지역·임대·유의사항"
+            placeholder="물건상세조회 → 감정평가요항표 내용"
           />
+          <p className="mt-1 text-right text-[11px] text-slate-500">
+            {form.appraisalSummary.length.toLocaleString("ko-KR")}자
+          </p>
         </Section>
 
-        {/* 5 Documents */}
-        <Section n={5} title="서류 첨부" hint="샘플에서는 자동 첨부 상태로 표시 · 프로덕션에서 PDF 다운로드 연동">
+        {/* 6 Documents */}
+        <Section n={6} title="서류 첨부" hint="샘플에서는 자동 첨부 상태로 표시 · 프로덕션에서 PDF 다운로드 연동">
           <div className="grid gap-3 md:grid-cols-3">
             {(["saleSpec", "appraisal", "status"] as const).map((type) => {
               const doc = docs.find((d) => d.type === type) ?? {
@@ -721,8 +800,8 @@ export function AuctionRegisterAutofillClient() {
           </div>
         </Section>
 
-        {/* 6 Photos */}
-        <Section n={6} title="사진" hint="법원 사진은 직접 다운받아 첨부하세요 (샘플은 로컬 미리보기만)">
+        {/* 7 Photos */}
+        <Section n={7} title="사진" hint="법원 사진은 직접 다운받아 첨부하세요 (샘플은 로컬 미리보기만)">
           <input
             ref={photoRef}
             type="file"
@@ -762,8 +841,8 @@ export function AuctionRegisterAutofillClient() {
           </div>
         </Section>
 
-        {/* 7 Chance opinion */}
-        <Section n={7} title="찬스부동산 의견" hint="내부 권리분석·메모와 별도 · 고객 안내용 코멘트">
+        {/* 8 Chance opinion */}
+        <Section n={8} title="찬스부동산 의견" hint="내부 권리분석·메모와 별도 · 고객 안내용 코멘트">
           <textarea
             className={`${inputClass} min-h-[140px]`}
             value={form.chanceOpinion}

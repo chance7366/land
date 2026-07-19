@@ -1,5 +1,8 @@
 /** Sample fixtures from courtauction.go.kr lookups. Cached snapshots — not live-fetched at runtime. */
 
+import { HS_15044_CASE_DETAIL } from "@/lib/mockup/auction-case-detail-sample";
+import type { CaseDetail } from "@/lib/auction-case-detail";
+
 export type FormGroup = "UNIT" | "HOUSE" | "LAND";
 
 export type DocSlot = {
@@ -22,6 +25,37 @@ export type ScheduleRow = {
   place: string;
   minPrice: number | null;
   result: string;
+};
+
+/** 법원 현황조사서 팝업 서식 (selectCurstExmndc) */
+export type StatusLeaseRow = {
+  no: number;
+  address: string;
+  leaseCountLabel: string;
+  occupant: string;
+  partyType: string;
+  occupyPart: string;
+  usage: string;
+  occupyPeriod: string;
+  deposit: string;
+  rent: string;
+  moveInDate: string;
+  fixedDate: string;
+  leaseEtc: string;
+};
+
+export type StatusReport = {
+  available: boolean;
+  court: string;
+  ordRound: string;
+  caseLabel: string;
+  surveyedAt: string;
+  photoCount: number;
+  photoLabel: string;
+  possessionAddress: string;
+  possessionRelation: string;
+  possessionEtc: string;
+  leases: StatusLeaseRow[];
 };
 
 export type CourtAuctionFixture = {
@@ -61,6 +95,10 @@ export type CourtAuctionFixture = {
   leaseNote: string;
   assumeRightsNote: string;
   saleShare?: string;
+  /** 현황조사서 — 없으면 미제공 */
+  statusReport?: StatusReport;
+  /** 사건상세(사건내역+문건/송달) — 없으면 미제공 */
+  caseDetail?: CaseDetail;
 };
 
 const DOCS_UNIT: DocSlot[] = [
@@ -139,7 +177,89 @@ export const COURT_OPTIONS = [
   "홍성지원",
 ] as const;
 
+/** 홍성지원 2026타경15044 — 현황조사서 실조회 샘플 (법원 팝업 서식) */
+const HS_15044_STATUS: StatusReport = {
+  available: true,
+  court: "홍성지원",
+  ordRound: "1",
+  caseLabel: "2026타경15044 부동산강제경매",
+  surveyedAt: "2026년02월02일13시50분",
+  photoCount: 4,
+  photoLabel: "전경도 4건",
+  possessionAddress:
+    "1. 충청남도 홍성군 홍북읍 신경리 1204 엘에이치스타힐스 103동 5층501호",
+  possessionRelation: "임차인(별지)점유",
+  possessionEtc:
+    "- 본 부동산에 관하여 임차인 이은희의 배우자 유병우와 통화한바, 본인의 배우자인 이은희로 하여금 임대차계약을 하여 점유중이라함.\n- 별지 첨부 전입세대열람 내역과 같이 이은희 세대 전입신고되어 있어 일응 점유자로 등재함.",
+  leases: [
+    {
+      no: 1,
+      address:
+        "충청남도 홍성군 홍북읍 신경리 1204 엘에이치스타힐스 103동 5층501호",
+      leaseCountLabel: "1명",
+      occupant: "이은희",
+      partyType: "임차인",
+      occupyPart: "",
+      usage: "주거",
+      occupyPeriod: "2024.06.17. ~ 2026.06.17.",
+      deposit: "5,000,000",
+      rent: "550,000",
+      moveInDate: "2024.06.21.",
+      fixedDate: "",
+      leaseEtc:
+        "- 본 부동산에 관하여 임차인 이은희의 배우자 유병우와 통화한바, 본인의 배우자인 이은희로 하여금 임대차계약을 하여 점유중이라하며 제출한 아파트 월세 계약서를 토대로 작성함.\n- 행정기관에 전입세대열람 의뢰하여 보니 이은희 세대 전입신고되어 있음.",
+    },
+  ],
+};
+
 export const FIXTURES: CourtAuctionFixture[] = [
+  {
+    id: "hs-15044-1",
+    court: "홍성지원",
+    caseYear: "2026",
+    caseSerial: "15044",
+    caseNumber: "2026타경15044",
+    itemNo: 1,
+    formGroup: "UNIT",
+    itemType: "아파트",
+    auctionType: "부동산강제경매",
+    title: "홍북읍 엘에이치스타힐스 103동 501호",
+    region: "충남 홍성군",
+    parcels: [
+      {
+        no: 1,
+        listKind: "집합건물",
+        address:
+          "(아파트) 충청남도 홍성군 홍북읍 신경리 1204 엘에이치스타힐스 103동 5층501호",
+        detail: "집합건물 · 현황조사서 있음",
+      },
+    ],
+    exclusiveArea: 0,
+    appraisalPrice: 0,
+    minPrice: 0,
+    bidDeposit: 0,
+    claimAmount: 0,
+    bidMethod: "기일입찰",
+    saleDate: "",
+    saleDateLabel: "",
+    receivedAt: "2026.01.01",
+    startedAt: "",
+    dividendDeadline: "",
+    remarks: "",
+    appraisalSummary:
+      "홍북읍 신경리 LH스타힐스 아파트. 임차인 점유·월세. 현황조사서(2026.02.02) 기준.",
+    schedule: [],
+    documents: [
+      { type: "saleSpec", label: "매각물건명세서", name: "매각물건명세서.pdf", status: "attached" },
+      { type: "appraisal", label: "감정평가서", name: "감정평가서.pdf", status: "attached" },
+      { type: "status", label: "현황조사서", name: "현황조사서.pdf", status: "attached" },
+    ],
+    possessionNote: "임차인(별지)점유",
+    leaseNote: "임차인 1명 · 보증 500만 / 월세 55만",
+    assumeRightsNote: "명세서·현황조사서 확인",
+    statusReport: HS_15044_STATUS,
+    caseDetail: HS_15044_CASE_DETAIL,
+  },
   {
     id: "hs-15803-1",
     court: "홍성지원",
@@ -764,15 +884,30 @@ export function getFixtureById(id: string): CourtAuctionFixture | undefined {
 }
 
 /** Unique cases for quick-pick (first item of each case). */
-export function listCasePresets(): { label: string; court: string; caseSerial: string; group: FormGroup }[] {
+export function listCasePresets(): {
+  label: string;
+  court: string;
+  caseYear: string;
+  caseSerial: string;
+  group: FormGroup;
+}[] {
   const seen = new Set<string>();
-  const out: { label: string; court: string; caseSerial: string; group: FormGroup }[] = [];
+  const out: {
+    label: string;
+    court: string;
+    caseYear: string;
+    caseSerial: string;
+    group: FormGroup;
+  }[] = [];
   for (const f of FIXTURES) {
     if (seen.has(f.caseNumber)) continue;
     seen.add(f.caseNumber);
     out.push({
-      label: `${f.caseNumber} · ${f.itemType} (${f.formGroup})`,
+      label: `${f.caseNumber} · ${f.itemType} (${f.formGroup})${
+        f.statusReport?.available ? " · 현황조사" : ""
+      }`,
       court: f.court,
+      caseYear: f.caseYear,
       caseSerial: f.caseSerial,
       group: f.formGroup,
     });

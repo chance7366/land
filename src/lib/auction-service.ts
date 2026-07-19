@@ -37,6 +37,7 @@ export type AuctionInput = {
   debtorOwner?: string | null;
   creditor?: string | null;
   rightsAnalysis?: string | null;
+  caseDetailJson?: string | null;
   memo?: string | null;
   images?: string[];
   attachments?: AuctionAttachment[];
@@ -140,6 +141,7 @@ export function toAuctionCreateData(input: AuctionInput & { manageCode: string }
     debtorOwner: input.debtorOwner ?? null,
     creditor: input.creditor ?? null,
     rightsAnalysis: input.rightsAnalysis ?? null,
+    caseDetailJson: input.caseDetailJson ?? null,
     memo: input.memo ?? null,
     winningPrice,
     winningRatio,
@@ -200,6 +202,7 @@ export function parseAuctionBody(
       debtorOwner: strOrNull(body.debtorOwner),
       creditor: strOrNull(body.creditor),
       rightsAnalysis: strOrNull(body.rightsAnalysis),
+      caseDetailJson: strOrNull(body.caseDetailJson),
       memo: strOrNull(body.memo),
       images: Array.isArray(body.images) ? (body.images as string[]).filter(Boolean).slice(0, 8) : [],
       attachments: parseAttachmentsBody(body.attachments),

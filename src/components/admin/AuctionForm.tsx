@@ -22,6 +22,7 @@ import { suggestAuctionTitle } from "@/lib/auction-title";
 import {
   type CourtAuctionFixture,
   type FormGroup,
+  type StatusReport,
   COURT_OPTIONS,
   findFixturesByCase,
   formatWon,
@@ -34,6 +35,17 @@ import {
   parseAuctionAttachments,
 } from "@/lib/auction-attachments";
 import { askManageCodeConflict, type ManageCodeConflictResponse } from "@/lib/manage-code-conflict";
+import {
+  StatusReportSection,
+  emptyStatusReport,
+} from "@/components/auction/StatusReportSection";
+import { CaseDetailSection } from "@/components/auction/CaseDetailSection";
+import {
+  caseDetailFromRights,
+  cloneCaseDetail,
+  emptyCaseDetail,
+  type CaseDetail,
+} from "@/lib/auction-case-detail";
 
 const MAX_IMAGES = 8;
 
@@ -251,6 +263,31 @@ function sectionFromRights(text: string, key: string): string {
   return m?.[1]?.trim() ?? "";
 }
 
+function statusReportFromRights(text: string): StatusReport {
+  const raw = sectionFromRights(text, "현황조사서JSON");
+  if (!raw) return emptyStatusReport();
+  try {
+    const parsed = JSON.parse(raw) as StatusReport;
+    if (parsed && typeof parsed === "object") {
+      return {
+        ...emptyStatusReport(),
+        ...parsed,
+        leases: Array.isArray(parsed.leases) ? parsed.leases : emptyStatusReport().leases,
+      };
+    }
+  } catch {
+    /* ignore */
+  }
+  return emptyStatusReport();
+}
+
+function cloneStatusReport(report: StatusReport): StatusReport {
+  return {
+    ...report,
+    leases: report.leases.map((l) => ({ ...l })),
+  };
+}
+
 function auctionToForm(auction?: Auction): FormState {
   if (!auction) return emptyForm();
   const { year, serial } = parseCaseParts(auction.caseNumber);
@@ -352,7 +389,12 @@ function fixtureToForm(f: CourtAuctionFixture): FormState {
   };
 }
 
-function buildRightsAnalysis(form: FormState, scheduleLines: string): string {
+function buildRightsAnalysis(
+  form: FormState,
+  scheduleLines: string,
+  statusReport?: StatusReport,
+  caseDetail?: CaseDetail,
+): string {
   const lines = [
     form.appraisalSummary ? `[감정요약] ${form.appraisalSummary}` : "",
     form.possessionNote ? `[점유] ${form.possessionNote}` : "",
@@ -364,8 +406,29 @@ function buildRightsAnalysis(form: FormState, scheduleLines: string): string {
     form.landShareDenom && form.landShareNumer
       ? `[대지권] ${form.landShareDenom}분의 ${form.landShareNumer}`
       : "",
+    statusReport?.available
+      ? `[현황조사서JSON]\n${JSON.stringify(statusReport)}`
+      : "",
+    caseDetail?.available
+      ? `[사건상세JSON]\n${JSON.stringify(caseDetail)}`
+      : "",
   ].filter(Boolean);
   return lines.join("\n\n");
+}
+
+function loadCaseDetail(auction?: Auction): CaseDetail {
+  const fromCol = (auction as Auction & { caseDetailJson?: string | null })?.caseDetailJson;
+  if (fromCol) {
+    try {
+      const parsed = JSON.parse(fromCol) as CaseDetail;
+      if (parsed && typeof parsed === "object") {
+        return { ...emptyCaseDetail(), ...parsed };
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+  return caseDetailFromRights(auction?.rightsAnalysis ?? "");
 }
 
 type AuctionFormProps = { initial?: Auction };
@@ -375,6 +438,10 @@ export function AuctionForm({ initial }: AuctionFormProps) {
   const [form, setForm] = useState<FormState>(() => auctionToForm(initial));
   const [parcels, setParcels] = useState<CourtAuctionFixture["parcels"]>([]);
   const [schedule, setSchedule] = useState<CourtAuctionFixture["schedule"]>([]);
+  const [statusReport, setStatusReport] = useState<StatusReport>(() =>
+    statusReportFromRights(initial?.rightsAnalysis ?? ""),
+  );
+  const [caseDetail, setCaseDetail] = useState<CaseDetail>(() => loadCaseDetail(initial));
   const [docSlots, setDocSlots] = useState<DocSlotState[]>(() =>
     AUCTION_DOC_SLOTS.map((s) => ({ type: s.type, courtStatus: "none" as const })),
   );
@@ -437,6 +504,16 @@ export function AuctionForm({ initial }: AuctionFormProps) {
     setForm(next);
     setParcels(f.parcels.slice(0, 2));
     setSchedule(f.schedule);
+    if (f.statusReport?.available) {
+      setStatusReport(cloneStatusReport(f.statusReport));
+    } else {
+      setStatusReport(emptyStatusReport());
+    }
+    if (f.caseDetail?.available) {
+      setCaseDetail(cloneCaseDetail(f.caseDetail));
+    } else {
+      setCaseDetail(emptyCaseDetail(f.court));
+    }
     setDocSlots(
       AUCTION_DOC_SLOTS.map((s) => {
         if (!s.courtLinked) return { type: s.type, courtStatus: "none" as const };
@@ -476,9 +553,15 @@ export function AuctionForm({ initial }: AuctionFormProps) {
         "possessionNote",
         "leaseNote",
         "assumeRightsNote",
+        ...(f.statusReport?.available ? ["statusReport"] : []),
+        ...(f.caseDetail?.available ? ["caseDetail"] : []),
       ]),
     );
-    setToast(`${f.caseNumber} 물건 ${f.itemNo} · ${groupLabel(f.formGroup)} 자동입력 완료`);
+    const statusHint = f.statusReport?.available ? " · 현황조사서" : "";
+    const caseHint = f.caseDetail?.available ? " · 사건상세" : "";
+    setToast(
+      `${f.caseNumber} 물건 ${f.itemNo} · ${groupLabel(f.formGroup)} 자동입력 완료${statusHint}${caseHint}`,
+    );
   }
 
   function applyFetchedMatches(
@@ -536,16 +619,9 @@ export function AuctionForm({ initial }: AuctionFormProps) {
       return;
     }
 
-    // 1) local cache first
+    // 1) 법원 실시간 조회 우선 (감정평가요항표·현황조사서 원문)
+    // 2) 실패 시에만 로컬 캐시 픽스처
     const cached = findFixturesByCase(form.court, serial);
-    if (cached.length > 0) {
-      await new Promise((r) => setTimeout(r, 400));
-      setFetching(false);
-      applyFetchedMatches(cached, preferredItem, year, serial, "cache");
-      return;
-    }
-
-    // 2) live courtauction.go.kr
     setToast("법원경매 사이트에서 조회 중…");
     try {
       const res = await fetch("/api/admin/auctions/court-fetch", {
@@ -564,22 +640,34 @@ export function AuctionForm({ initial }: AuctionFormProps) {
         items?: CourtAuctionFixture[];
       };
       setFetching(false);
-      if (!res.ok || !data.ok || !data.items?.length) {
-        setToast("");
-        setError(data.error ?? "법원에서 사건을 불러오지 못했습니다.");
-        setForm((prev) => ({
-          ...prev,
-          caseYear: year,
-          caseSerial: serial,
-          caseTail: formatCaseTail(serial, preferredItem ?? null),
-          caseNumber: `${year}타경${serial}`,
-          itemNo: preferredItem ?? null,
-        }));
+      if (res.ok && data.ok && data.items?.length) {
+        applyFetchedMatches(data.items, preferredItem, year, serial, "live");
         return;
       }
-      applyFetchedMatches(data.items, preferredItem, year, serial, "live");
+      if (cached.length > 0) {
+        applyFetchedMatches(cached, preferredItem, year, serial, "cache");
+        setToast(
+          (data.error ? `${data.error} · ` : "") + "로컬 캐시로 채웠습니다. 감정요약은 샘플일 수 있습니다.",
+        );
+        return;
+      }
+      setToast("");
+      setError(data.error ?? "법원에서 사건을 불러오지 못했습니다.");
+      setForm((prev) => ({
+        ...prev,
+        caseYear: year,
+        caseSerial: serial,
+        caseTail: formatCaseTail(serial, preferredItem ?? null),
+        caseNumber: `${year}타경${serial}`,
+        itemNo: preferredItem ?? null,
+      }));
     } catch {
       setFetching(false);
+      if (cached.length > 0) {
+        applyFetchedMatches(cached, preferredItem, year, serial, "cache");
+        setToast("네트워크 오류 · 로컬 캐시로 채웠습니다.");
+        return;
+      }
       setToast("");
       setError("법원 조회 요청에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     }
@@ -716,7 +804,8 @@ export function AuctionForm({ initial }: AuctionFormProps) {
       secondBidAmount: moneyDigits(form.secondBidAmount)
         ? Number(moneyDigits(form.secondBidAmount))
         : null,
-      rightsAnalysis: buildRightsAnalysis(form, scheduleLines),
+      rightsAnalysis: buildRightsAnalysis(form, scheduleLines, statusReport, caseDetail),
+      caseDetailJson: caseDetail.available ? JSON.stringify(caseDetail) : null,
       memo: form.chanceOpinion || null,
       images,
       attachments,
@@ -940,11 +1029,24 @@ export function AuctionForm({ initial }: AuctionFormProps) {
       </GlassCard>
 
       <div className="mt-6 flex flex-wrap gap-2 text-[11px]">
-        {["기본", "가격·기일", "물건상세", "감정요약", "서류", "사진", "찬스의견", "추천입찰가", "낙찰결과"].map((label, i) => (
+        {[
+          "기본",
+          "가격·기일",
+          "물건상세",
+          "현황조사서",
+          "감정요약",
+          "서류",
+          "사진",
+          "찬스의견",
+          "추천입찰가",
+          "낙찰결과",
+        ].map((label, i) => (
           <span
             key={label}
             className={`rounded-full border px-2.5 py-1 ${
-              filled ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200" : "border-white/10 text-slate-500"
+              filled && (label !== "현황조사서" || statusReport.available)
+                ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
+                : "border-white/10 text-slate-500"
             }`}
           >
             {i + 1}. {label}
@@ -1181,32 +1283,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
           />
         </GlassCard>
 
-        <Section n={3} title="물건상세">
-          {parcels.length > 0 && (
-            <div className="mb-4 overflow-auto rounded-xl border border-white/10">
-              <table className="w-full text-left text-xs text-[#cbd5e1]">
-                <thead>
-                  <tr className="bg-white/[0.04]">
-                    <th className="px-3 py-2">목록</th>
-                    <th className="px-3 py-2">구분</th>
-                    <th className="px-3 py-2">소재지</th>
-                    <th className="px-3 py-2">상세</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {parcels.map((p) => (
-                    <tr key={p.no} className="border-t border-white/5">
-                      <td className="px-3 py-2">{p.no}</td>
-                      <td className="px-3 py-2">{p.listKind}</td>
-                      <td className="px-3 py-2">{p.address}</td>
-                      <td className="px-3 py-2 text-slate-400">{p.detail}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
+        <CaseDetailSection n={3} data={caseDetail}>
           {form.formGroup === "UNIT" && (
             <div className="grid gap-3 md:grid-cols-3">
               <Field label="전유면적 (㎡)">
@@ -1316,18 +1393,41 @@ export function AuctionForm({ initial }: AuctionFormProps) {
               />
             </Field>
           </div>
-        </Section>
+        </CaseDetailSection>
 
-        <Section n={4} title="감정요약">
-          <textarea
-            className={`${cls("appraisalSummary")} min-h-[120px]`}
-            value={form.appraisalSummary}
-            onChange={(e) => setField("appraisalSummary", e.target.value)}
-          />
-        </Section>
+        <StatusReportSection
+          n={4}
+          report={statusReport}
+          autoFilled={autoKeys.has("statusReport")}
+          onChange={(next) => {
+            setStatusReport(next);
+            setAutoKeys((prev) => {
+              if (!prev.has("statusReport")) return prev;
+              const nset = new Set(prev);
+              nset.delete("statusReport");
+              return nset;
+            });
+          }}
+        />
 
         <Section
           n={5}
+          title="감정요약"
+          hint="법원 감정평가요항표 원문 전체 · 글자 수 제한 없음"
+        >
+          <textarea
+            className={`${cls("appraisalSummary")} min-h-[280px] whitespace-pre-wrap`}
+            value={form.appraisalSummary}
+            onChange={(e) => setField("appraisalSummary", e.target.value)}
+            placeholder="물건상세조회 → 감정평가요항표 내용이 자동 입력됩니다"
+          />
+          <p className="mt-1 text-right text-[11px] text-slate-500">
+            {form.appraisalSummary.length.toLocaleString("ko-KR")}자
+          </p>
+        </Section>
+
+        <Section
+          n={6}
           title="서류 첨부"
           hint="법원 PDF 자동 다운로드는 아직 연동 전입니다. 제공 여부는 불러오기 시 표시되며, 파일은 슬롯별 수동 첨부(이미지/PDF)하세요."
         >
@@ -1402,7 +1502,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
           </div>
         </Section>
 
-        <Section n={6} title="사진" hint="복수 첨부 가능 · 최대 8장 · 법원 사진은 직접 다운받아 첨부">
+        <Section n={7} title="사진" hint="복수 첨부 가능 · 최대 8장 · 법원 사진은 직접 다운받아 첨부">
           <input
             ref={photoRef}
             type="file"
@@ -1437,7 +1537,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
           </div>
         </Section>
 
-        <Section n={7} title="찬스부동산 의견" hint="고객 안내용 · 권리분석과 별도 저장(memo)">
+        <Section n={8} title="찬스부동산 의견" hint="고객 안내용 · 권리분석과 별도 저장(memo)">
           <textarea
             className={`${inputClass} min-h-[140px]`}
             value={form.chanceOpinion}
@@ -1448,7 +1548,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
           <p className="mt-1 text-right text-[11px] text-slate-500">{form.chanceOpinion.length}/2000</p>
         </Section>
 
-        <Section n={8} title="추천입찰가격">
+        <Section n={9} title="추천입찰가격">
           <Field label="추천입찰가격 (원)">
             <input
               className={`${inputClass} max-w-md tabular-nums`}
@@ -1460,7 +1560,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
           </Field>
         </Section>
 
-        <Section n={9} title="낙찰결과">
+        <Section n={10} title="낙찰결과">
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="낙찰가격 (원)">
               <input
@@ -1521,6 +1621,8 @@ export function AuctionForm({ initial }: AuctionFormProps) {
                   setAttachments(parseAuctionAttachments(initial.attachments || "[]"));
                   setParcels([]);
                   setSchedule([]);
+                  setStatusReport(statusReportFromRights(initial.rightsAnalysis ?? ""));
+                  setCaseDetail(loadCaseDetail(initial));
                   setDocSlots(
                     AUCTION_DOC_SLOTS.map((s) => ({ type: s.type, courtStatus: "none" as const })),
                   );
@@ -1533,6 +1635,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
                   setAttachments([]);
                   setParcels([]);
                   setSchedule([]);
+                  setStatusReport(emptyStatusReport());
                   setDocSlots(
                     AUCTION_DOC_SLOTS.map((s) => ({ type: s.type, courtStatus: "none" as const })),
                   );

@@ -179,6 +179,8 @@ model Auction {
   creditor          String?
   attachments       String             @default("[]")
   rightsAnalysis    String?
+  /// 법원 사건상세(사건내역+문건/송달) JSON
+  caseDetailJson    String?
   memo              String?
   winningPrice      Float?
   winningRatio      Float?
