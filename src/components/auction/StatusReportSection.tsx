@@ -79,7 +79,7 @@ type Props = {
 
 /** 법원 현황조사서 팝업과 동일한 입력 서식 — 항상 필드 구조 노출 */
 export function StatusReportSection({
-  n = 4,
+  n = 6,
   title = "현황조사서",
   report,
   autoFilled = false,

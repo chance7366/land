@@ -1,14 +1,21 @@
 # 부동산소식 수집 Windows 작업 등록 (매일 08:00 / 14:00 / 20:00 로컬=KST)
+# 콘솔 창이 뜨지 않도록 wscript + Hidden PowerShell로 등록합니다.
 $ErrorActionPreference = "Stop"
 
 $script = Join-Path $PSScriptRoot "run-news-feed-collect.ps1"
+$hiddenVbs = Join-Path $PSScriptRoot "run-news-feed-collect-hidden.vbs"
 if (-not (Test-Path $script)) {
   throw "Missing $script"
 }
+if (-not (Test-Path $hiddenVbs)) {
+  throw "Missing $hiddenVbs"
+}
 
 $taskName = "Chance-NewsFeed-Collect"
-$arg = "-NoProfile -ExecutionPolicy Bypass -File `"$script`""
-$action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $arg
+# //B = wscript 자체 UI 숨김, VBS가 PowerShell을 창 스타일 0으로 실행
+$action = New-ScheduledTaskAction `
+  -Execute "wscript.exe" `
+  -Argument "//B `"$hiddenVbs`""
 $triggers = @(
   (New-ScheduledTaskTrigger -Daily -At "08:00"),
   (New-ScheduledTaskTrigger -Daily -At "14:00"),
@@ -29,9 +36,10 @@ Register-ScheduledTask `
   -Trigger $triggers `
   -Settings $settings `
   -Principal $principal `
-  -Description "찬스부동산 부동산소식 수집 (08:00/14:00/20:00 KST)" `
+  -Description "찬스부동산 부동산소식 수집 (08:00/14:00/20:00 KST, 창 숨김)" `
   -Force | Out-Null
 
-Write-Host "Registered scheduled task: $taskName"
+Write-Host "Registered scheduled task: $taskName (hidden window)"
 Write-Host "Triggers: daily 08:00, 14:00, 20:00"
+Write-Host "Action: wscript.exe //B `"$hiddenVbs`""
 Get-ScheduledTask -TaskName $taskName | Get-ScheduledTaskInfo | Format-List TaskName, NextRunTime, LastRunTime, LastTaskResult

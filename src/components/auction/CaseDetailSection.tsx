@@ -65,10 +65,12 @@ type Props = {
   data: CaseDetail;
   /** 등록용 요약 입력란 (전유면적·점유 등) */
   children?: React.ReactNode;
+  /** true면 목록내역 표 숨김 (전용 섹션 사용 시) */
+  hideLists?: boolean;
 };
 
-/** 3. 물건상세 — 법원 사건상세조회(사건내역 + 문건/송달내역) */
-export function CaseDetailSection({ n = 3, data, children }: Props) {
+/** 물건상세 — 법원 사건상세조회(사건내역 + 문건/송달내역) */
+export function CaseDetailSection({ n = 5, data, children, hideLists = false }: Props) {
   const [tab, setTab] = useState<TabId>("case");
 
   return (
@@ -107,7 +109,7 @@ export function CaseDetailSection({ n = 3, data, children }: Props) {
           </button>
         ))}
         <span className="hidden items-center px-3 text-[10px] text-slate-600 md:flex">
-          기일내역은 섹션 2
+          기일·목록·감정은 섹션 2–4
         </span>
       </div>
 
@@ -237,35 +239,37 @@ export function CaseDetailSection({ n = 3, data, children }: Props) {
             </div>
           </section>
 
-          <section>
-            <SubHead>목록내역</SubHead>
-            <DataTable maxHeight="200px">
-              <table className="w-full text-left text-xs text-[#cbd5e1]">
-                <thead>
-                  <tr className="bg-[#0B0F19]/90">
-                    <th className="px-3 py-2">목록</th>
-                    <th className="px-3 py-2">구분</th>
-                    <th className="px-3 py-2">소재지</th>
-                    <th className="px-3 py-2">상세</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.lists.length === 0 ? (
-                    <EmptyRow colSpan={4} />
-                  ) : (
-                    data.lists.map((r) => (
-                      <tr key={r.no} className="border-t border-white/5">
-                        <td className="px-3 py-2">{r.no}</td>
-                        <td className="px-3 py-2">{r.listKind}</td>
-                        <td className="px-3 py-2">{r.address}</td>
-                        <td className="px-3 py-2 text-slate-400">{r.detail || "—"}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </DataTable>
-          </section>
+          {!hideLists && (
+            <section>
+              <SubHead>목록내역</SubHead>
+              <DataTable maxHeight="200px">
+                <table className="w-full text-left text-xs text-[#cbd5e1]">
+                  <thead>
+                    <tr className="bg-[#0B0F19]/90">
+                      <th className="px-3 py-2">목록</th>
+                      <th className="px-3 py-2">구분</th>
+                      <th className="px-3 py-2">소재지</th>
+                      <th className="px-3 py-2">상세</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.lists.length === 0 ? (
+                      <EmptyRow colSpan={4} />
+                    ) : (
+                      data.lists.map((r) => (
+                        <tr key={r.no} className="border-t border-white/5">
+                          <td className="px-3 py-2">{r.no}</td>
+                          <td className="px-3 py-2">{r.listKind}</td>
+                          <td className="px-3 py-2">{r.address}</td>
+                          <td className="px-3 py-2 text-slate-400">{r.detail || "—"}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </DataTable>
+            </section>
+          )}
 
           <section>
             <SubHead icon={<Users className="h-4 w-4" />}>당사자내역</SubHead>

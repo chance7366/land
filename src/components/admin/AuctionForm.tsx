@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  AlertTriangle,
   CheckCircle2,
   FileText,
   ImagePlus,
@@ -40,12 +39,19 @@ import {
   emptyStatusReport,
 } from "@/components/auction/StatusReportSection";
 import { CaseDetailSection } from "@/components/auction/CaseDetailSection";
+import { BasicPropertyInfoPanel } from "@/components/auction/BasicPropertyInfoPanel";
+import { ListDetailsPanel } from "@/components/auction/ListDetailsPanel";
 import {
   caseDetailFromRights,
   cloneCaseDetail,
   emptyCaseDetail,
   type CaseDetail,
 } from "@/lib/auction-case-detail";
+import type { AuctionBasicInfoView } from "@/lib/auction-basic-info";
+import {
+  firstAddressFromDetail,
+  type AuctionListDetailRow,
+} from "@/lib/auction-list-details";
 
 const MAX_IMAGES = 8;
 
@@ -389,11 +395,52 @@ function fixtureToForm(f: CourtAuctionFixture): FormState {
   };
 }
 
+function listDetailsFromRights(text: string): AuctionListDetailRow[] {
+  const raw = sectionFromRights(text, "목록내역JSON");
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw) as AuctionListDetailRow[];
+      if (Array.isArray(parsed) && parsed.length) {
+        return parsed
+          .filter((r) => r && Number(r.no) > 0)
+          .map((r) => ({
+            no: Number(r.no),
+            listKind: String(r.listKind || ""),
+            detail: String(r.detail || ""),
+          }));
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+  return [];
+}
+
+function listDetailsFromCaseDetail(detail: CaseDetail): AuctionListDetailRow[] {
+  if (!detail.lists?.length) return [];
+  return detail.lists.map((r) => ({
+    no: r.no,
+    listKind: r.listKind,
+    detail:
+      r.detail && r.detail.length >= 8
+        ? r.detail
+        : [r.address, r.detail].filter(Boolean).join("\n"),
+  }));
+}
+
+function loadListDetails(auction?: Auction, caseDetail?: CaseDetail): AuctionListDetailRow[] {
+  const fromRights = listDetailsFromRights(auction?.rightsAnalysis ?? "");
+  if (fromRights.length) return fromRights;
+  if (caseDetail) return listDetailsFromCaseDetail(caseDetail);
+  return [];
+}
+
 function buildRightsAnalysis(
   form: FormState,
   scheduleLines: string,
   statusReport?: StatusReport,
   caseDetail?: CaseDetail,
+  listDetails?: AuctionListDetailRow[],
 ): string {
   const lines = [
     form.appraisalSummary ? `[감정요약] ${form.appraisalSummary}` : "",
@@ -405,6 +452,9 @@ function buildRightsAnalysis(
     scheduleLines ? `[기일내역]\n${scheduleLines}` : "",
     form.landShareDenom && form.landShareNumer
       ? `[대지권] ${form.landShareDenom}분의 ${form.landShareNumer}`
+      : "",
+    listDetails && listDetails.length
+      ? `[목록내역JSON]\n${JSON.stringify(listDetails)}`
       : "",
     statusReport?.available
       ? `[현황조사서JSON]\n${JSON.stringify(statusReport)}`
@@ -431,6 +481,67 @@ function loadCaseDetail(auction?: Auction): CaseDetail {
   return caseDetailFromRights(auction?.rightsAnalysis ?? "");
 }
 
+function toIsoDisplay(saleDate: string, saleDateLabel: string): string {
+  if (saleDateLabel.trim()) return saleDateLabel.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(saleDate)) {
+    const [y, m, d] = saleDate.split("-");
+    return `${y}.${m}.${d}`;
+  }
+  return saleDate;
+}
+
+function buildBasicInfoView(
+  form: FormState,
+  parcels: CourtAuctionFixture["parcels"],
+  caseDetail: CaseDetail,
+): AuctionBasicInfoView {
+  const caseNumber =
+    form.caseNumber.trim() ||
+    (form.caseSerial ? `${form.caseYear}타경${form.caseSerial}` : "");
+  const locations =
+    parcels.length > 0
+      ? parcels.map((p) => ({
+          no: p.no,
+          kindLabel: p.listKind ? `(${p.listKind})` : "",
+          address: p.address,
+        }))
+      : [
+          form.address
+            ? { no: 1, kindLabel: "", address: form.address }
+            : null,
+          form.address2
+            ? { no: 2, kindLabel: "", address: form.address2 }
+            : null,
+        ].filter(Boolean) as AuctionBasicInfoView["locations"];
+
+  const deptFromCase = caseDetail.basic.dept?.trim() || "";
+  const dept = deptFromCase
+    ? deptFromCase.includes("|")
+      ? deptFromCase
+      : `${form.court || caseDetail.court || ""} | ${deptFromCase}`.replace(/^\s*\|\s*/, "")
+    : form.court || caseDetail.court || "";
+
+  return {
+    electronic: false,
+    caseNumber,
+    itemNo: form.itemNo,
+    itemType: form.itemType,
+    appraisalPrice: Number(moneyDigits(form.appraisalPrice) || 0),
+    minPrice: Number(moneyDigits(form.minPrice) || 0),
+    bidDeposit: Number(moneyDigits(form.bidDeposit) || 0),
+    bidMethod: form.bidMethod || "기일입찰",
+    saleDateLabel: toIsoDisplay(form.saleDate, form.saleDateLabel),
+    remarks: form.remarks,
+    locations,
+    dept,
+    receivedAt: form.receivedAt || caseDetail.basic.receivedAt || "",
+    startedAt: form.startedAt || caseDetail.basic.startedAt || "",
+    dividendDeadline: form.dividendDeadline || caseDetail.dividendDeadlines[0]?.deadline || "",
+    claimAmount:
+      Number(moneyDigits(form.claimAmount) || 0) || caseDetail.basic.claimAmount || 0,
+  };
+}
+
 type AuctionFormProps = { initial?: Auction };
 
 export function AuctionForm({ initial }: AuctionFormProps) {
@@ -442,6 +553,9 @@ export function AuctionForm({ initial }: AuctionFormProps) {
     statusReportFromRights(initial?.rightsAnalysis ?? ""),
   );
   const [caseDetail, setCaseDetail] = useState<CaseDetail>(() => loadCaseDetail(initial));
+  const [listDetails, setListDetails] = useState<AuctionListDetailRow[]>(() =>
+    loadListDetails(initial, loadCaseDetail(initial)),
+  );
   const [docSlots, setDocSlots] = useState<DocSlotState[]>(() =>
     AUCTION_DOC_SLOTS.map((s) => ({ type: s.type, courtStatus: "none" as const })),
   );
@@ -514,6 +628,16 @@ export function AuctionForm({ initial }: AuctionFormProps) {
     } else {
       setCaseDetail(emptyCaseDetail(f.court));
     }
+    if (f.listDetails?.length) {
+      setListDetails(f.listDetails.map((r) => ({ ...r })));
+    } else if (f.caseDetail?.lists?.length) {
+      setListDetails(listDetailsFromCaseDetail(f.caseDetail));
+    } else {
+      setListDetails([]);
+    }
+    if (f.courtImages?.length) {
+      setImages(f.courtImages.slice(0, MAX_IMAGES));
+    }
     setDocSlots(
       AUCTION_DOC_SLOTS.map((s) => {
         if (!s.courtLinked) return { type: s.type, courtStatus: "none" as const };
@@ -555,12 +679,22 @@ export function AuctionForm({ initial }: AuctionFormProps) {
         "assumeRightsNote",
         ...(f.statusReport?.available ? ["statusReport"] : []),
         ...(f.caseDetail?.available ? ["caseDetail"] : []),
+        ...(f.listDetails?.length || f.caseDetail?.lists?.length ? ["listDetails"] : []),
+        ...(f.courtImages?.length ? ["courtImages"] : []),
       ]),
     );
     const statusHint = f.statusReport?.available ? " · 현황조사서" : "";
     const caseHint = f.caseDetail?.available ? " · 사건상세" : "";
+    const photoTotal = f.courtImageTotal ?? f.courtImages?.length ?? 0;
+    const photoSaved = f.courtImages?.length ?? 0;
+    const photoHint =
+      photoSaved > 0
+        ? photoTotal > MAX_IMAGES
+          ? ` · 사진 ${photoSaved}/${photoTotal}장(최대 ${MAX_IMAGES})`
+          : ` · 사진 ${photoSaved}장`
+        : "";
     setToast(
-      `${f.caseNumber} 물건 ${f.itemNo} · ${groupLabel(f.formGroup)} 자동입력 완료${statusHint}${caseHint}`,
+      `${f.caseNumber} 물건 ${f.itemNo} · ${groupLabel(f.formGroup)} 자동입력 완료${statusHint}${caseHint}${photoHint}`,
     );
   }
 
@@ -571,9 +705,16 @@ export function AuctionForm({ initial }: AuctionFormProps) {
     serial: string,
     source: "cache" | "live",
   ) {
-    if (matches.length > 1) {
+    // 동일 물건번호 fixture가 중복되면(목록 행 분리 등) 하나만 남김
+    const uniqueByItem = new Map<number, CourtAuctionFixture>();
+    for (const m of matches) {
+      if (!uniqueByItem.has(m.itemNo)) uniqueByItem.set(m.itemNo, m);
+    }
+    const uniqueMatches = [...uniqueByItem.values()];
+
+    if (uniqueMatches.length > 1) {
       const picked = preferredItem
-        ? matches.find((m) => m.itemNo === preferredItem)
+        ? uniqueMatches.find((m) => m.itemNo === preferredItem)
         : undefined;
       if (picked) {
         applyFixture(picked);
@@ -582,21 +723,23 @@ export function AuctionForm({ initial }: AuctionFormProps) {
         );
         return;
       }
-      setItemChoices(matches);
+      setItemChoices(uniqueMatches);
       setForm((prev) => ({
         ...prev,
         caseYear: year,
         caseSerial: serial,
         caseTail: formatCaseTail(serial, null),
-        caseNumber: matches[0].caseNumber,
+        caseNumber: uniqueMatches[0].caseNumber,
         itemNo: null,
       }));
-      setToast(`${matches[0].caseNumber} — 물건 ${matches.length}개. 번호를 선택하세요.`);
+      setToast(
+        `${uniqueMatches[0].caseNumber} — 물건 ${uniqueMatches.length}개. 번호를 선택하세요.`,
+      );
       return;
     }
-    applyFixture(matches[0]);
+    applyFixture(uniqueMatches[0]);
     setToast(
-      `${matches[0].caseNumber} 물건 ${matches[0].itemNo} · ${source === "live" ? "실시간" : "캐시"} 불러오기 완료`,
+      `${uniqueMatches[0].caseNumber} 물건 ${uniqueMatches[0].itemNo} · ${source === "live" ? "실시간" : "캐시"} 불러오기 완료`,
     );
   }
 
@@ -804,8 +947,38 @@ export function AuctionForm({ initial }: AuctionFormProps) {
       secondBidAmount: moneyDigits(form.secondBidAmount)
         ? Number(moneyDigits(form.secondBidAmount))
         : null,
-      rightsAnalysis: buildRightsAnalysis(form, scheduleLines, statusReport, caseDetail),
-      caseDetailJson: caseDetail.available ? JSON.stringify(caseDetail) : null,
+      rightsAnalysis: buildRightsAnalysis(
+        form,
+        scheduleLines,
+        statusReport,
+        caseDetail.available && listDetails.length
+          ? {
+              ...caseDetail,
+              lists: listDetails.map((r) => ({
+                no: r.no,
+                listKind: r.listKind,
+                address: firstAddressFromDetail(r.detail),
+                detail: r.detail,
+              })),
+            }
+          : caseDetail,
+        listDetails,
+      ),
+      caseDetailJson: caseDetail.available
+        ? JSON.stringify(
+            listDetails.length
+              ? {
+                  ...caseDetail,
+                  lists: listDetails.map((r) => ({
+                    no: r.no,
+                    listKind: r.listKind,
+                    address: firstAddressFromDetail(r.detail),
+                    detail: r.detail,
+                  })),
+                }
+              : caseDetail,
+          )
+        : null,
       memo: form.chanceOpinion || null,
       images,
       attachments,
@@ -861,9 +1034,6 @@ export function AuctionForm({ initial }: AuctionFormProps) {
     return () => clearTimeout(t);
   }, [toast]);
 
-  const appraisal = Number(moneyDigits(form.appraisalPrice) || 0);
-  const minPrice = Number(moneyDigits(form.minPrice) || 0);
-  const minPct = appraisal > 0 && minPrice > 0 ? Math.round((minPrice / appraisal) * 1000) / 10 : null;
   const cls = (key: string) => (autoKeys.has(key) ? autoClass : inputClass);
 
   return (
@@ -1011,9 +1181,9 @@ export function AuctionForm({ initial }: AuctionFormProps) {
             <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-400/10 p-4">
               <p className="mb-2 text-xs font-semibold text-amber-100">물건번호 선택</p>
               <div className="flex flex-wrap gap-2">
-                {itemChoices.map((it) => (
+                {itemChoices.map((it, idx) => (
                   <button
-                    key={it.id}
+                    key={`${it.id}-${it.itemNo}-${idx}`}
                     type="button"
                     onClick={() => applyFixture(it)}
                     className="rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-left text-sm text-white hover:border-[#4dabff]/50"
@@ -1031,10 +1201,11 @@ export function AuctionForm({ initial }: AuctionFormProps) {
       <div className="mt-6 flex flex-wrap gap-2 text-[11px]">
         {[
           "기본",
-          "가격·기일",
+          "기일 내역",
+          "목록 내역",
+          "감정요약",
           "물건상세",
           "현황조사서",
-          "감정요약",
           "서류",
           "사진",
           "찬스의견",
@@ -1066,186 +1237,82 @@ export function AuctionForm({ initial }: AuctionFormProps) {
       )}
 
       <div className="mt-6 space-y-5">
-        <Section n={1} title="기본정보">
-          <div className="grid gap-3 md:grid-cols-2">
-            <Field label="사건번호">
-              <input
-                className={cls("caseNumber")}
-                value={form.caseNumber || (form.caseSerial ? `${form.caseYear}타경${form.caseSerial}` : "")}
-                placeholder="상단에서 연도·타경 뒷자리 입력"
-                readOnly
-              />
-            </Field>
-            <Field label="물건번호">
-              <input
-                className={cls("itemNo")}
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={form.itemNo ?? ""}
-                onChange={(e) => {
-                  const digits = e.target.value.replace(/\D/g, "");
-                  if (!digits) {
-                    setForm((prev) => ({
-                      ...prev,
-                      itemNo: null,
-                      caseTail: prev.caseSerial ? formatCaseTail(prev.caseSerial, null) : "",
-                    }));
-                    return;
-                  }
-                  const n = Math.max(1, Number(digits));
-                  setForm((prev) => ({
-                    ...prev,
-                    itemNo: n,
-                    caseTail: prev.caseSerial ? formatCaseTail(prev.caseSerial, n) : prev.caseTail,
-                    caseNumber: prev.caseSerial
-                      ? `${prev.caseYear}타경${prev.caseSerial}`
-                      : prev.caseNumber,
-                  }));
-                }}
-                placeholder="있을 때만"
-              />
-            </Field>
-            <Field label="경매종류">
-              <input
-                className={cls("auctionType")}
-                value={form.auctionType}
-                onChange={(e) => setField("auctionType", e.target.value)}
-              />
-            </Field>
-            <Field label="물건종류">
-              <input
-                className={cls("itemType")}
-                value={form.itemType}
-                onChange={(e) => setField("itemType", e.target.value)}
-              />
-            </Field>
-            <Field label="제목 *" className="md:col-span-2">
-              <input
-                className={cls("title")}
-                value={form.title}
-                onChange={(e) => setField("title", e.target.value)}
-              />
-            </Field>
-            <Field label="소재지 1" className="md:col-span-2">
-              <input
-                className={cls("address")}
-                value={form.address}
-                onChange={(e) => setField("address", e.target.value)}
-                placeholder="목록1 소재지"
-              />
-            </Field>
-            <Field label="소재지 2" className="md:col-span-2">
-              <input
-                className={cls("address2")}
-                value={form.address2}
-                onChange={(e) => setField("address2", e.target.value)}
-                placeholder="목록2 소재지 (없으면 비움 · 최대 2건 저장)"
-              />
-            </Field>
-            <Field label="지역 태그">
-              <input
-                className={cls("region")}
-                value={form.region}
-                onChange={(e) => setField("region", e.target.value)}
-              />
-            </Field>
-            <Field label="상태 / 안전등급 / Featured">
-              <div className="flex flex-wrap gap-2">
-                <select
-                  className={inputClass}
-                  value={form.status}
-                  onChange={(e) => setField("status", e.target.value)}
-                >
-                  <option value="ONGOING">진행중</option>
-                  <option value="CLOSED">낙찰/종결</option>
-                  <option value="FAILED">유찰</option>
-                </select>
-                <select
-                  className={inputClass}
-                  value={form.safetyGrade}
-                  onChange={(e) => setField("safetyGrade", e.target.value)}
-                >
-                  <option value="SAFE">안전</option>
-                  <option value="CAUTION">주의</option>
-                  <option value="RISK">위험</option>
-                </select>
-                <label className="flex items-center gap-2 text-sm text-slate-300">
-                  <input
-                    type="checkbox"
-                    checked={form.featured}
-                    onChange={(e) => setField("featured", e.target.checked)}
-                  />
-                  Featured
-                </label>
-              </div>
-            </Field>
+        <Section
+          n={1}
+          title="기본정보"
+          hint="법원 물건기본정보 서식 · 가격·소재지·접수정보는 이 표에 통합"
+        >
+          <BasicPropertyInfoPanel
+            data={buildBasicInfoView(form, parcels, caseDetail)}
+          />
+
+          <div className="mt-5 border-t border-white/10 pt-4">
+            <p className="mb-3 text-[11px] font-semibold text-slate-400">
+              등록 설정 · 수동 수정
+            </p>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Field label="제목 *" className="md:col-span-2">
+                <input
+                  className={cls("title")}
+                  value={form.title}
+                  onChange={(e) => setField("title", e.target.value)}
+                />
+              </Field>
+              <Field label="경매종류">
+                <input
+                  className={cls("auctionType")}
+                  value={form.auctionType}
+                  onChange={(e) => setField("auctionType", e.target.value)}
+                />
+              </Field>
+              <Field label="지역 태그">
+                <input
+                  className={cls("region")}
+                  value={form.region}
+                  onChange={(e) => setField("region", e.target.value)}
+                />
+              </Field>
+              <Field label="상태 / 안전등급 / Featured" className="md:col-span-2">
+                <div className="flex flex-wrap gap-2">
+                  <select
+                    className={inputClass}
+                    value={form.status}
+                    onChange={(e) => setField("status", e.target.value)}
+                  >
+                    <option value="ONGOING">진행중</option>
+                    <option value="CLOSED">낙찰/종결</option>
+                    <option value="FAILED">유찰</option>
+                  </select>
+                  <select
+                    className={inputClass}
+                    value={form.safetyGrade}
+                    onChange={(e) => setField("safetyGrade", e.target.value)}
+                  >
+                    <option value="SAFE">안전</option>
+                    <option value="CAUTION">주의</option>
+                    <option value="RISK">위험</option>
+                  </select>
+                  <label className="flex items-center gap-2 text-sm text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={form.featured}
+                      onChange={(e) => setField("featured", e.target.checked)}
+                    />
+                    Featured
+                  </label>
+                </div>
+              </Field>
+            </div>
           </div>
         </Section>
 
-        <Section n={2} title="가격 · 기일">
-          <div className="grid gap-3 md:grid-cols-3">
-            <Field label="감정가 (원)">
-              <input
-                className={`${cls("appraisalPrice")} tabular-nums`}
-                inputMode="numeric"
-                value={formatMoneyDisplay(form.appraisalPrice)}
-                onChange={(e) => setMoneyField("appraisalPrice", e.target.value)}
-              />
-            </Field>
-            <Field label={`최저가 (원)${minPct != null ? ` · ${minPct}%` : ""}`}>
-              <input
-                className={`${cls("minPrice")} tabular-nums`}
-                inputMode="numeric"
-                value={formatMoneyDisplay(form.minPrice)}
-                onChange={(e) => setMoneyField("minPrice", e.target.value)}
-              />
-            </Field>
-            <Field label="입찰보증금 (원)">
-              <input
-                className={`${cls("bidDeposit")} tabular-nums`}
-                inputMode="numeric"
-                value={formatMoneyDisplay(form.bidDeposit)}
-                onChange={(e) => setMoneyField("bidDeposit", e.target.value)}
-              />
-            </Field>
-            <Field label="청구금액 (원)">
-              <input
-                className={`${cls("claimAmount")} tabular-nums`}
-                inputMode="numeric"
-                value={formatMoneyDisplay(form.claimAmount)}
-                onChange={(e) => setMoneyField("claimAmount", e.target.value)}
-              />
-            </Field>
-            <Field label="입찰방법">
-              <input
-                className={cls("bidMethod")}
-                value={form.bidMethod}
-                onChange={(e) => setField("bidMethod", e.target.value)}
-              />
-            </Field>
-            <Field label="매각기일 (연-월-일)">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  className={`${cls("saleDate")} tabular-nums`}
-                  placeholder="2026-07-19"
-                  value={form.saleDate}
-                  onChange={(e) => setField("saleDate", e.target.value)}
-                />
-                <input
-                  type="date"
-                  className="w-[42px] shrink-0 rounded-xl border border-white/10 bg-black/30 px-1 text-sm text-slate-100"
-                  value={/^\d{4}-\d{2}-\d{2}$/.test(form.saleDate) ? form.saleDate : ""}
-                  onChange={(e) => setField("saleDate", e.target.value)}
-                  title="달력 선택"
-                />
-              </div>
-              <p className="mt-1 text-[10px] text-slate-500">형식: YYYY-MM-DD (예: 2026-07-19)</p>
-            </Field>
-          </div>
-          {schedule.length > 0 && (
-            <div className="data-table mt-4 max-h-56 overflow-auto rounded-xl border border-white/10">
+        <Section
+          n={2}
+          title="기일 내역"
+          hint="법원 기일내역 표 · 최저가·결과 포함"
+        >
+          {schedule.length > 0 ? (
+            <div className="data-table max-h-56 overflow-auto rounded-xl border border-white/10">
               <table className="w-full text-left text-xs text-[#cbd5e1]">
                 <thead>
                   <tr className="bg-[#0B0F19]/90">
@@ -1260,30 +1327,53 @@ export function AuctionForm({ initial }: AuctionFormProps) {
                     <tr key={`${row.date}-${row.kind}`} className="border-t border-white/5">
                       <td className="px-3 py-2">{row.date}</td>
                       <td className="px-3 py-2">{row.kind}</td>
-                      <td className="px-3 py-2">{row.minPrice != null ? formatWon(row.minPrice) : "—"}</td>
+                      <td className="px-3 py-2">
+                        {row.minPrice != null ? formatWon(row.minPrice) : "—"}
+                      </td>
                       <td className="px-3 py-2">{row.result || "—"}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+          ) : (
+            <p className="text-sm text-slate-500">
+              불러오기 후 기일내역이 표시됩니다.
+            </p>
           )}
         </Section>
 
-        <GlassCard className="border-amber-400/25 bg-amber-500/[0.06] p-5">
-          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-amber-100">
-            <AlertTriangle className="h-4 w-4" />
-            물건비고
-          </div>
-          <textarea
-            className={`${cls("remarks")} min-h-[80px] whitespace-pre-wrap`}
-            value={form.remarks}
-            onChange={(e) => setField("remarks", e.target.value)}
-            placeholder="농취증, 우선매수권, 재매각 조건 등"
-          />
-        </GlassCard>
+        <Section
+          n={3}
+          title="목록 내역"
+          hint="법원 목록내역 · #mf_wfm_mainFrame_grp_lstDtsLimtMin · 1건·다건"
+        >
+          {listDetails.length > 0 ? (
+            <ListDetailsPanel rows={listDetails} />
+          ) : (
+            <p className="text-sm text-slate-500">
+              불러오기 후 목록내역이 표시됩니다.
+            </p>
+          )}
+        </Section>
 
-        <CaseDetailSection n={3} data={caseDetail}>
+        <Section
+          n={4}
+          title="감정요약"
+          hint="법원 감정평가요항표 원문 전체 · 글자 수 제한 없음"
+        >
+          <textarea
+            className={`${cls("appraisalSummary")} min-h-[280px] whitespace-pre-wrap`}
+            value={form.appraisalSummary}
+            onChange={(e) => setField("appraisalSummary", e.target.value)}
+            placeholder="물건상세조회 → 감정평가요항표 내용이 자동 입력됩니다"
+          />
+          <p className="mt-1 text-right text-[11px] text-slate-500">
+            {form.appraisalSummary.length.toLocaleString("ko-KR")}자
+          </p>
+        </Section>
+
+        <CaseDetailSection n={5} data={caseDetail} hideLists>
           {form.formGroup === "UNIT" && (
             <div className="grid gap-3 md:grid-cols-3">
               <Field label="전유면적 (㎡)">
@@ -1396,7 +1486,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
         </CaseDetailSection>
 
         <StatusReportSection
-          n={4}
+          n={6}
           report={statusReport}
           autoFilled={autoKeys.has("statusReport")}
           onChange={(next) => {
@@ -1411,23 +1501,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
         />
 
         <Section
-          n={5}
-          title="감정요약"
-          hint="법원 감정평가요항표 원문 전체 · 글자 수 제한 없음"
-        >
-          <textarea
-            className={`${cls("appraisalSummary")} min-h-[280px] whitespace-pre-wrap`}
-            value={form.appraisalSummary}
-            onChange={(e) => setField("appraisalSummary", e.target.value)}
-            placeholder="물건상세조회 → 감정평가요항표 내용이 자동 입력됩니다"
-          />
-          <p className="mt-1 text-right text-[11px] text-slate-500">
-            {form.appraisalSummary.length.toLocaleString("ko-KR")}자
-          </p>
-        </Section>
-
-        <Section
-          n={6}
+          n={7}
           title="서류 첨부"
           hint="법원 PDF 자동 다운로드는 아직 연동 전입니다. 제공 여부는 불러오기 시 표시되며, 파일은 슬롯별 수동 첨부(이미지/PDF)하세요."
         >
@@ -1502,7 +1576,11 @@ export function AuctionForm({ initial }: AuctionFormProps) {
           </div>
         </Section>
 
-        <Section n={7} title="사진" hint="복수 첨부 가능 · 최대 8장 · 법원 사진은 직접 다운받아 첨부">
+        <Section
+          n={8}
+          title="사진"
+          hint="복수 첨부 가능 · 최대 8장 · 법원 불러오기 시 gen_pic 자동첨부"
+        >
           <input
             ref={photoRef}
             type="file"
@@ -1511,15 +1589,41 @@ export function AuctionForm({ initial }: AuctionFormProps) {
             className="hidden"
             onChange={(e) => void uploadImages(e.target.files)}
           />
+          {autoKeys.has("courtImages") && images.length > 0 && (
+            <p className="mb-3 text-[11px] text-emerald-300/90">
+              법원 물건사진 {images.length}장 자동 등록됨
+              {images.length >= MAX_IMAGES ? ` · 한도 ${MAX_IMAGES}장` : ""}
+            </p>
+          )}
           <div className="flex flex-wrap gap-3">
             {images.map((url, i) => (
-              <div key={url} className="relative h-24 w-24 overflow-hidden rounded-xl border border-white/10">
+              <div
+                key={`${url}-${i}`}
+                className={`relative h-24 w-24 overflow-hidden rounded-xl border ${
+                  autoKeys.has("courtImages")
+                    ? "border-emerald-400/35 bg-emerald-500/[0.07]"
+                    : "border-white/10"
+                }`}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={url} alt="" className="h-full w-full object-cover" />
+                {autoKeys.has("courtImages") && (
+                  <span className="absolute bottom-0 left-0 right-0 bg-black/65 px-1 py-0.5 text-center text-[9px] text-emerald-200">
+                    자동
+                  </span>
+                )}
                 <button
                   type="button"
                   className="absolute right-1 top-1 rounded-full bg-black/70 p-1"
-                  onClick={() => setImages((list) => list.filter((_, idx) => idx !== i))}
+                  onClick={() => {
+                    setImages((list) => list.filter((_, idx) => idx !== i));
+                    setAutoKeys((prev) => {
+                      if (!prev.has("courtImages")) return prev;
+                      const next = new Set(prev);
+                      next.delete("courtImages");
+                      return next;
+                    });
+                  }}
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -1537,7 +1641,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
           </div>
         </Section>
 
-        <Section n={8} title="찬스부동산 의견" hint="고객 안내용 · 권리분석과 별도 저장(memo)">
+        <Section n={9} title="찬스부동산 의견" hint="고객 안내용 · 권리분석과 별도 저장(memo)">
           <textarea
             className={`${inputClass} min-h-[140px]`}
             value={form.chanceOpinion}
@@ -1548,7 +1652,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
           <p className="mt-1 text-right text-[11px] text-slate-500">{form.chanceOpinion.length}/2000</p>
         </Section>
 
-        <Section n={9} title="추천입찰가격">
+        <Section n={10} title="추천입찰가격">
           <Field label="추천입찰가격 (원)">
             <input
               className={`${inputClass} max-w-md tabular-nums`}
@@ -1560,7 +1664,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
           </Field>
         </Section>
 
-        <Section n={10} title="낙찰결과">
+        <Section n={11} title="낙찰결과">
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="낙찰가격 (원)">
               <input
@@ -1622,7 +1726,9 @@ export function AuctionForm({ initial }: AuctionFormProps) {
                   setParcels([]);
                   setSchedule([]);
                   setStatusReport(statusReportFromRights(initial.rightsAnalysis ?? ""));
-                  setCaseDetail(loadCaseDetail(initial));
+                  const restoredCase = loadCaseDetail(initial);
+                  setCaseDetail(restoredCase);
+                  setListDetails(loadListDetails(initial, restoredCase));
                   setDocSlots(
                     AUCTION_DOC_SLOTS.map((s) => ({ type: s.type, courtStatus: "none" as const })),
                   );
@@ -1636,6 +1742,8 @@ export function AuctionForm({ initial }: AuctionFormProps) {
                   setParcels([]);
                   setSchedule([]);
                   setStatusReport(emptyStatusReport());
+                  setCaseDetail(emptyCaseDetail());
+                  setListDetails([]);
                   setDocSlots(
                     AUCTION_DOC_SLOTS.map((s) => ({ type: s.type, courtStatus: "none" as const })),
                   );

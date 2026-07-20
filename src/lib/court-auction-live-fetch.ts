@@ -12,6 +12,16 @@ import {
   parseCaseDetailFromSrchJson,
   type CaseDetail,
 } from "@/lib/auction-case-detail";
+import {
+  listDetailsToCaseListRows,
+  parseListDetailsFromDomSnapshot,
+  type AuctionListDetailRow,
+} from "@/lib/auction-list-details";
+import {
+  extractCourtPhotosFromPage,
+  persistCourtPhotos,
+  type CourtPhotoPersistResult,
+} from "@/lib/court-auction-photos";
 
 const SEARCH_URL =
   "https://www.courtauction.go.kr/pgj/index.on?w2xPath=/pgj/ui/pgj100/PGJ159M00.xml&pgjId=159M00";
@@ -330,27 +340,124 @@ type ParsedItem = {
   addresses: string[];
 };
 
+const USG_LABEL: Record<string, string> = {
+  "01": "아파트",
+  "02": "다세대",
+  "03": "연립",
+  "07": "오피스텔",
+  "08": "근린시설",
+  "12": "토지",
+  "13": "전답",
+  "14": "임야",
+  "15": "대지",
+};
+
+/** selectAuctnCsSrchRslt → dlt_dspslGdsDspslObjctLst (DOM 물건내역보다 안정적) */
+function parseItemsFromSrchJson(json: unknown): ParsedItem[] {
+  const list = (json as { data?: { dlt_dspslGdsDspslObjctLst?: unknown } } | null)
+    ?.data?.dlt_dspslGdsDspslObjctLst;
+  if (!Array.isArray(list) || !list.length) return [];
+
+  // 동일 물건번호(dspslGdsSeq)에 목록(dspslObjctSeq)이 여러 줄로 올 수 있음 → 물건 단위로 합침
+  const byItemNo = new Map<number, ParsedItem>();
+
+  for (const row of list) {
+    const r = row as Record<string, unknown>;
+    const itemNo = Number(r.dspslGdsSeq || 0) || 1;
+    const usg = String(r.auctnGdsUsgCd || "");
+    const appraisalPrice = parseWon(String(r.aeeEvlAmt ?? ""));
+    const minPrice =
+      parseWon(String(r.dspslAmt ?? "")) ||
+      parseWon(String(r.fstPbancLwsDspslPrc ?? ""));
+    const rate = Number(r.prchDposRate || 10);
+    const bidDeposit =
+      minPrice > 0 && Number.isFinite(rate)
+        ? Math.round((minPrice * rate) / 100)
+        : 0;
+    const addr =
+      String(r.userSt || r.printSt || "").trim() ||
+      [
+        r.adongSdNm,
+        r.adongSggNm,
+        r.adongEmdNm,
+        r.adongRiNm,
+        r.rprsLtnoAddr,
+        r.bldNm,
+        r.bldDtlDts,
+      ]
+        .map((x) => String(x || "").trim())
+        .filter(Boolean)
+        .join(" ");
+    const ymd = String(r.dspslDxdyYmd || "").replace(/\D/g, "");
+    const saleDateLabel =
+      ymd.length === 8
+        ? `${ymd.slice(0, 4)}.${ymd.slice(4, 6)}.${ymd.slice(6, 8)}`
+        : String(r.dspslDxdyYmd || "").trim();
+    const remarks = String(r.dspslGdsRmk || "")
+      .replace(/^\s*-?\s*/, "")
+      .trim();
+
+    const existing = byItemNo.get(itemNo);
+    if (!existing) {
+      byItemNo.set(itemNo, {
+        itemNo,
+        itemType: USG_LABEL[usg] || String(r.auctnGdsUsgNm || "").trim() || "",
+        appraisalPrice,
+        minPrice,
+        bidDeposit,
+        saleDateLabel,
+        recentResult: "",
+        remarks,
+        addresses: addr ? [addr] : [],
+      });
+      continue;
+    }
+    if (addr && !existing.addresses.includes(addr)) {
+      existing.addresses.push(addr);
+    }
+    if (!existing.remarks && remarks) existing.remarks = remarks;
+    if (!existing.itemType && usg) {
+      existing.itemType = USG_LABEL[usg] || String(r.auctnGdsUsgNm || "").trim() || "";
+    }
+    if (!existing.appraisalPrice && appraisalPrice) existing.appraisalPrice = appraisalPrice;
+    if (!existing.minPrice && minPrice) {
+      existing.minPrice = minPrice;
+      existing.bidDeposit = bidDeposit;
+    }
+    if (!existing.saleDateLabel && saleDateLabel) existing.saleDateLabel = saleDateLabel;
+  }
+
+  return [...byItemNo.values()].sort((a, b) => a.itemNo - b.itemNo);
+}
+
 function parseItems(itemSection: string): ParsedItem[] {
   const items: ParsedItem[] = [];
-  const blocks = itemSection.split(/물건번호\s*\n/).slice(1);
+  // "물건번호\n\t1\t" / "물건번호\n1\n" / "물건번호 1" 모두 허용
+  const blocks = itemSection.split(/물건번호\s*[\n\t]+/).slice(1);
   for (const b of blocks) {
     const no = Number((b.match(/^\s*(\d+)/) || [])[1] || 0);
     if (!no) continue;
-    const itemType = (b.match(/물건용도\s*\n\s*([^\n]+)/) || [])[1]?.trim() || "";
+    const itemType =
+      (b.match(/물건용도\s*[\n\t]+\s*([^\n\t]+)/) || [])[1]?.trim() || "";
     const money = [...b.matchAll(/([\d,]+원)/g)].map((x) => x[1]);
-    const saleDateLabel = (b.match(/기일정보\s*\n\s*([^\n]+)/) || [])[1]?.trim() || "";
-    const recentResult = (b.match(/최근입찰결과\s*\n\s*([^\n]*)/) || [])[1]?.trim() || "";
-    const remarksBlock = (b.match(/물건비고\s*\n([\s\S]*?)(?=\n목록\d|\n물건상태|\n기일정보|$)/) || [])[1];
+    const saleDateLabel =
+      (b.match(/기일정보\s*[\n\t]+\s*([^\n\t]+)/) || [])[1]?.trim() || "";
+    const recentResult =
+      (b.match(/최근입찰결과\s*[\n\t]+\s*([^\n]*)/) || [])[1]?.trim() || "";
+    const remarksBlock = (b.match(
+      /물건비고\s*[\n\t]+([\s\S]*?)(?=\n목록\d|\n물건상태|\n기일정보|$)/,
+    ) || [])[1];
     const remarks = (remarksBlock || "")
       .split("\n")
       .map((l) => l.trim())
       .filter((l) => l && !/^목록/.test(l))
       .join("\n")
       .trim();
-    const addresses = [...b.matchAll(/(?:충청|전라|경상|강원|제주)?[남북]?도?\s*[^\n]*(?:시|군|구)[^\n]*/g)]
+    const addresses = [
+      ...b.matchAll(/(?:충청|전라|경상|강원|제주)?[남북]?도?\s*[^\n]*(?:시|군|구)[^\n]*/g),
+    ]
       .map((x) => x[0].replace(/\t.*/, "").trim())
       .filter((v, i, a) => v.length > 6 && a.indexOf(v) === i);
-    // also catch "충청남도 ..." style
     const more = [...b.matchAll(/충청남도[^\n\t]+/g)].map((x) => x[0].trim());
     for (const a of more) if (!addresses.includes(a)) addresses.push(a);
 
@@ -491,6 +598,8 @@ function toFixtures(args: {
   scheduleByItem?: Map<number, ScheduleRow[]>;
   caseDetail?: CaseDetail | null;
   statusReport?: StatusReport | null;
+  listDetails?: AuctionListDetailRow[];
+  courtPhotos?: CourtPhotoPersistResult | null;
 }): CourtAuctionFixture[] {
   const siblings = args.items.map((it) => ({
     itemNo: it.itemNo,
@@ -590,16 +699,21 @@ function toFixtures(args: {
               recentResult: it.recentResult || args.caseDetail.item.recentResult,
             },
             lists:
-              args.caseDetail.lists.length > 0
-                ? args.caseDetail.lists
-                : parcels.map((p) => ({
-                    no: p.no,
-                    listKind: p.listKind,
-                    address: p.address,
-                    detail: p.detail,
-                  })),
+              args.listDetails && args.listDetails.length > 0
+                ? listDetailsToCaseListRows(args.listDetails)
+                : args.caseDetail.lists.length > 0
+                  ? args.caseDetail.lists
+                  : parcels.map((p) => ({
+                      no: p.no,
+                      listKind: p.listKind,
+                      address: p.address,
+                      detail: p.detail,
+                    })),
           }
         : undefined,
+      listDetails: args.listDetails?.length ? args.listDetails : undefined,
+      courtImages: args.courtPhotos?.urls?.length ? args.courtPhotos.urls : undefined,
+      courtImageTotal: args.courtPhotos?.totalFromCourt ?? undefined,
     };
   });
 }
@@ -638,6 +752,31 @@ async function openCaseTab(page: Page) {
     t?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   });
   await page.waitForTimeout(1200);
+}
+
+/** #mf_wfm_mainFrame_grp_lstDtsLimtMin — 목록 1건·다건 */
+async function extractListDetails(page: Page): Promise<AuctionListDetailRow[]> {
+  const snap = await page.evaluate(() => {
+    const root = document.querySelector("#mf_wfm_mainFrame_grp_lstDtsLimtMin");
+    const fallbackText = root
+      ? (root as HTMLElement).innerText || ""
+      : "";
+    const table = root?.querySelector("table");
+    const tableRows: { noText: string; kind: string; detail: string }[] = [];
+    if (table) {
+      for (const tr of Array.from(table.querySelectorAll("tr"))) {
+        const tds = Array.from(tr.querySelectorAll("td"));
+        if (tds.length < 3) continue;
+        tableRows.push({
+          noText: (tds[0].textContent || "").trim(),
+          kind: (tds[1].textContent || "").trim(),
+          detail: (tds[2] as HTMLElement).innerText || tds[2].textContent || "",
+        });
+      }
+    }
+    return { tableRows, fallbackText };
+  });
+  return parseListDetailsFromDomSnapshot(snap);
 }
 
 /**
@@ -737,7 +876,9 @@ export async function fetchCourtAuctionLive(input: LiveFetchInput): Promise<Live
       try {
         if (/selectAuctnCsSrchRslt\.on/i.test(url)) {
           const json = await res.json();
-          latestSrch.current = json;
+          // 물건 목록이 있는 응답을 우선 유지 (이후 탭 호출이 빈 목록으로 덮어쓰지 않도록)
+          const gds = parseItemsFromSrchJson(json);
+          if (gds.length || !latestSrch.current) latestSrch.current = json;
           const points = extractAppraisalPointsFromJson(json);
           if (points.length) latestPoints.current = points;
           return;
@@ -755,6 +896,9 @@ export async function fetchCourtAuctionLive(input: LiveFetchInput): Promise<Live
     });
 
     await searchCase(page, court, caseYear, caseSerial);
+    for (let i = 0; i < 16 && !latestSrch.current; i++) {
+      await page.waitForTimeout(250);
+    }
 
     let text = await page.locator("body").innerText();
     const caseNumber = `${caseYear}타경${caseSerial}`;
@@ -792,6 +936,10 @@ export async function fetchCourtAuctionLive(input: LiveFetchInput): Promise<Live
     text = await page.locator("body").innerText();
     const fullText = `${text}\n${scheduleText}`;
 
+    // 목록내역(상세)·사진은 물건상세조회 화면에서 수집
+    let listDetails: AuctionListDetailRow[] = [];
+    let courtPhotos: CourtPhotoPersistResult | null = null;
+
     const basicIdx = Math.max(0, text.indexOf("사건기본내역"));
     const basic = text.slice(basicIdx, basicIdx + 1800);
     const auctionType = pickAfterLabel(basic, "사건명") || "";
@@ -807,10 +955,25 @@ export async function fetchCourtAuctionLive(input: LiveFetchInput): Promise<Live
     const dividendDeadline =
       (dividendSection.match(/(\d{4}\.\d{2}\.\d{2})/) || [])[1] || "";
 
+    // 물건내역: API(dlt_dspslGdsDspslObjctLst) 우선 — 탭 전환 후 DOM 파싱이 자주 실패함
     const itemStart = text.indexOf("물건내역");
     const itemEnd = listIdx > itemStart ? listIdx : itemStart + 6000;
     const itemSection = itemStart >= 0 ? text.slice(itemStart, itemEnd) : "";
-    let allItems = parseItems(itemSection);
+    let allItems = latestSrch.current
+      ? parseItemsFromSrchJson(latestSrch.current)
+      : [];
+    if (!allItems.length) {
+      allItems = parseItems(itemSection);
+    }
+    // API·DOM 모두 비었을 때 검색 직후 본문으로 한 번 더
+    if (!allItems.length) {
+      const raw = await page.locator("body").innerText();
+      const s = raw.indexOf("물건내역");
+      const e = raw.indexOf("목록내역");
+      if (s >= 0) {
+        allItems = parseItems(raw.slice(s, e > s ? e : s + 6000));
+      }
+    }
     if (!allItems.length) {
       const endResult = pickAfterLabel(basic, "종국결과") || "";
       return {
@@ -845,7 +1008,7 @@ export async function fetchCourtAuctionLive(input: LiveFetchInput): Promise<Live
       if (rows.length) scheduleByItem.set(it.itemNo, rows);
     }
 
-    // 감정평가요약: #wq_uuid_* 는 화면/종류마다 바뀌므로 API(aeeWevlMnpntLst) 우선
+    // 감정평가요약 + 목록내역(상세) — 물건상세조회 진입 필요
     const appraisalByItem = new Map<number, string>();
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
@@ -857,6 +1020,37 @@ export async function fetchCourtAuctionLive(input: LiveFetchInput): Promise<Live
       if (i > 0) {
         latestPoints.current = null;
         await searchCase(page, court, caseYear, caseSerial);
+      }
+
+      if (!listDetails.length || !courtPhotos) {
+        const opened = await openItemDetail(page, listIndex);
+        if (opened) {
+          if (!listDetails.length) {
+            listDetails = await extractListDetails(page);
+            if (!listDetails.length) {
+              const body = await page.locator("body").innerText();
+              const listStart = body.indexOf("목록내역");
+              if (listStart >= 0) {
+                const after = body.slice(listStart);
+                const cut = after.search(
+                  /\n(?:당사자내역|기일내역|목록구분이 집합건물|감정평가요항|COPYRIGHT)/,
+                );
+                listDetails = parseListDetailsFromDomSnapshot({
+                  tableRows: [],
+                  fallbackText: cut > 0 ? after.slice(0, cut) : after.slice(0, 8000),
+                });
+              }
+            }
+          }
+          if (!courtPhotos) {
+            const rawPhotos = await extractCourtPhotosFromPage(page);
+            if (rawPhotos.length) {
+              courtPhotos = await persistCourtPhotos(rawPhotos);
+            } else {
+              courtPhotos = { urls: [], totalFromCourt: 0, truncated: false };
+            }
+          }
+        }
       }
 
       const summary = await collectAppraisalSummary(
@@ -924,6 +1118,13 @@ export async function fetchCourtAuctionLive(input: LiveFetchInput): Promise<Live
       );
     }
 
+    if (caseDetail && listDetails.length) {
+      caseDetail = {
+        ...caseDetail,
+        lists: listDetailsToCaseListRows(listDetails),
+      };
+    }
+
     const fixtures = toFixtures({
       court,
       caseYear,
@@ -941,6 +1142,8 @@ export async function fetchCourtAuctionLive(input: LiveFetchInput): Promise<Live
       scheduleByItem,
       caseDetail,
       statusReport,
+      listDetails,
+      courtPhotos,
     });
 
     return { ok: true, items: fixtures, source: "live" };

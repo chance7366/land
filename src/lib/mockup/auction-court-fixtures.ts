@@ -99,6 +99,16 @@ export type CourtAuctionFixture = {
   statusReport?: StatusReport;
   /** 사건상세(사건내역+문건/송달) — 없으면 미제공 */
   caseDetail?: CaseDetail;
+  /** 목록내역 (법원 grp_lstDtsLimtMin) */
+  listDetails?: {
+    no: number;
+    listKind: string;
+    detail: string;
+  }[];
+  /** 법원 물건사진 업로드 URL (최대 8) */
+  courtImages?: string[];
+  /** 법원에서 읽은 전체 장수 (한도 초과 안내용) */
+  courtImageTotal?: number;
 };
 
 const DOCS_UNIT: DocSlot[] = [
