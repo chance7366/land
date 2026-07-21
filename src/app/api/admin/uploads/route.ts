@@ -40,6 +40,7 @@ const TYPE_BY_EXT: Record<string, string> = {
   ".gif": "image/gif",
   ".pdf": "application/pdf",
   ".csv": "text/csv",
+  ".txt": "text/plain",
   ".xls": "application/vnd.ms-excel",
   ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   ".doc": "application/msword",
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             error:
-              "JPG, PNG, WEBP, GIF, PDF, CSV, Excel(xls/xlsx), Word(doc/docx), 한글(hwp/hwpx)만 업로드할 수 있습니다.",
+              "JPG, PNG, WEBP, GIF, PDF, TXT, CSV, Excel(xls/xlsx), Word(doc/docx), 한글(hwp/hwpx)만 업로드할 수 있습니다.",
           },
           { status: 400 },
         );

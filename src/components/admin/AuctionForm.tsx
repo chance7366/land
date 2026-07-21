@@ -1865,13 +1865,13 @@ export function AuctionForm({ initial }: AuctionFormProps) {
         <Section
           n={8}
           title="입찰가산정 자료등록"
-          hint="슬롯별 파일 다건 첨부 + 텍스트 직접 입력/붙여넣기 가능 · PDF/PNG/JPG · Excel · CSV · Word · 한글(hwp/hwpx). 활용 방식은 추후 안내 예정입니다."
+          hint="슬롯별 파일 다건 첨부 + 텍스트 직접 입력/붙여넣기 가능 · PDF/PNG/JPG · TXT · Excel · CSV · Word · 한글(hwp/hwpx). 활용 방식은 추후 안내 예정입니다."
         >
           <input
             ref={bidUploadRef}
             type="file"
             multiple
-            accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.csv,.xls,.xlsx,.doc,.docx,.hwp,.hwpx,image/*,application/pdf,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.txt,.csv,.xls,.xlsx,.doc,.docx,.hwp,.hwpx,image/*,application/pdf,text/plain,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             className="hidden"
             onChange={(e) => {
               if (pendingBidType) void uploadBidValuationSlot(pendingBidType, e.target.files);

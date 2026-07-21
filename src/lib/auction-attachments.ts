@@ -5,7 +5,9 @@ export type AuctionDocType =
   | "registryBuilding"
   | "registryLand"
   | "buildingLedger"
-  | "residentMoveIn";
+  | "residentMoveIn"
+  | "expectedDividend"
+  | "yieldAnalysis";
 
 /** 입찰가 산정 자료 슬롯 */
 export type BiddingValuationDocType =
@@ -40,16 +42,18 @@ export const AUCTION_DOC_SLOTS: {
   { type: "registryLand", label: "등기부(토지)", courtLinked: false },
   { type: "buildingLedger", label: "건축물대장", courtLinked: false },
   { type: "residentMoveIn", label: "전입세대열람", courtLinked: false },
+  { type: "expectedDividend", label: "예상배당표", courtLinked: false },
+  { type: "yieldAnalysis", label: "수익률분석", courtLinked: false },
 ];
 
 export const BIDDING_VALUATION_SLOTS: {
   type: BiddingValuationDocType;
   label: string;
 }[] = [
-  { type: "bidNpay", label: "Npay매물가격" },
-  { type: "bidActualTrade", label: "실거래가격" },
-  { type: "bidNaverPrice", label: "네이버부동산시세" },
-  { type: "bidKbPrice", label: "KB부동산시세" },
+  { type: "bidNpay", label: "Npay부동산" },
+  { type: "bidActualTrade", label: "KB부동산" },
+  { type: "bidNaverPrice", label: "아실정보지" },
+  { type: "bidKbPrice", label: "호갱노노" },
   { type: "bidWinningCase", label: "낙찰사례" },
   { type: "bidCostData", label: "비용데이터" },
   { type: "bidOther1", label: "기타1" },
