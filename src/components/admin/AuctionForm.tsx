@@ -31,9 +31,20 @@ import {
 } from "@/lib/mockup/auction-court-fixtures";
 import {
   type AuctionAttachment,
+  type AuctionAttachmentType,
   type AuctionDocType,
+  type BiddingValuationDocType,
+  type BiddingValuationNotes,
   AUCTION_DOC_SLOTS,
+  BIDDING_VALUATION_SLOTS,
+  MAX_ATTACHMENTS_PER_SLOT,
+  MAX_ATTACHMENTS_TOTAL,
+  emptyBiddingValuationNotes,
+  filesForSlot,
+  hasBiddingValuationNotes,
   parseAuctionAttachments,
+  parseBiddingValuationNotes,
+  stringifyBiddingValuationNotes,
 } from "@/lib/auction-attachments";
 import { askManageCodeConflict, type ManageCodeConflictResponse } from "@/lib/manage-code-conflict";
 import {
@@ -561,6 +572,10 @@ function scheduleFromRights(text: string): ScheduleRow[] {
     });
 }
 
+function bidNotesFromRights(text: string): BiddingValuationNotes {
+  return parseBiddingValuationNotes(sectionFromRights(text, "입찰가산정텍스트JSON"));
+}
+
 function buildRightsAnalysis(
   form: FormState,
   schedule: ScheduleRow[],
@@ -568,6 +583,7 @@ function buildRightsAnalysis(
   caseDetail?: CaseDetail,
   listDetails?: AuctionListDetailRow[],
   docSlots?: DocSlotState[],
+  bidNotes?: BiddingValuationNotes,
 ): string {
   const scheduleLines = schedule
     .map(
@@ -605,6 +621,9 @@ function buildRightsAnalysis(
       ? `[사건상세JSON]\n${JSON.stringify(caseDetail)}`
       : "",
     docSlots?.length ? `[서류슬롯JSON]\n${JSON.stringify(docSlots)}` : "",
+    bidNotes && hasBiddingValuationNotes(bidNotes)
+      ? `[입찰가산정텍스트JSON]\n${stringifyBiddingValuationNotes(bidNotes)}`
+      : "",
     hasMeta ? `[등록메타JSON]\n${JSON.stringify(meta)}` : "",
   ].filter(Boolean);
   return lines.join("\n\n");
@@ -709,12 +728,18 @@ export function AuctionForm({ initial }: AuctionFormProps) {
   const [docSlots, setDocSlots] = useState<DocSlotState[]>(() =>
     docSlotsFromRights(initial?.rightsAnalysis ?? ""),
   );
+  const [bidNotes, setBidNotes] = useState<BiddingValuationNotes>(() =>
+    bidNotesFromRights(initial?.rightsAnalysis ?? ""),
+  );
   const [images, setImages] = useState<string[]>(() => parseImages(initial?.images || "[]"));
   const [attachments, setAttachments] = useState<AuctionAttachment[]>(() =>
     parseAuctionAttachments(initial?.attachments || "[]"),
   );
   const slotUploadRef = useRef<HTMLInputElement>(null);
+  const bidUploadRef = useRef<HTMLInputElement>(null);
   const [slotUploading, setSlotUploading] = useState<AuctionDocType | null>(null);
+  const [bidSlotUploading, setBidSlotUploading] = useState<BiddingValuationDocType | null>(null);
+  const [pendingBidType, setPendingBidType] = useState<BiddingValuationDocType | null>(null);
   const [autoKeys, setAutoKeys] = useState<Set<string>>(new Set());
   const [fetching, setFetching] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1035,6 +1060,57 @@ export function AuctionForm({ initial }: AuctionFormProps) {
     }
   }
 
+  async function uploadBidValuationSlot(
+    type: BiddingValuationDocType,
+    fileList: FileList | null,
+  ) {
+    if (!fileList?.length) return;
+    setBidSlotUploading(type);
+    setError("");
+    try {
+      const existing = filesForSlot(attachments, type);
+      const remainingSlot = MAX_ATTACHMENTS_PER_SLOT - existing.length;
+      const remainingTotal = MAX_ATTACHMENTS_TOTAL - attachments.length;
+      const room = Math.min(remainingSlot, remainingTotal, 20);
+      if (room <= 0) {
+        setError(
+          remainingSlot <= 0
+            ? `슬롯당 최대 ${MAX_ATTACHMENTS_PER_SLOT}개까지 첨부할 수 있습니다.`
+            : `첨부 파일은 전체 ${MAX_ATTACHMENTS_TOTAL}개를 넘을 수 없습니다.`,
+        );
+        return;
+      }
+      const picked = Array.from(fileList).slice(0, room);
+      const body = new FormData();
+      body.append("kind", "auctions");
+      for (const file of picked) body.append("files", file);
+      const res = await fetch("/api/admin/uploads", { method: "POST", body });
+      const data = (await res.json()) as { urls?: string[]; error?: string };
+      if (!res.ok) {
+        setError(data.error ?? "입찰가산정 자료 업로드에 실패했습니다.");
+        return;
+      }
+      const urls = data.urls ?? [];
+      const added: AuctionAttachment[] = urls.map((url, i) => ({
+        type,
+        url,
+        name: picked[i]?.name || url.split("/").pop() || "file",
+      }));
+      if (!added.length) return;
+      setAttachments((prev) => [...prev, ...added].slice(0, MAX_ATTACHMENTS_TOTAL));
+      setToast(`입찰가산정 자료 ${added.length}건이 첨부되었습니다.`);
+    } catch {
+      setError("입찰가산정 자료 업로드 중 오류가 발생했습니다.");
+    } finally {
+      setBidSlotUploading(null);
+      if (bidUploadRef.current) bidUploadRef.current.value = "";
+    }
+  }
+
+  function removeAttachment(type: AuctionAttachmentType, url: string) {
+    setAttachments((list) => list.filter((a) => !(a.type === type && a.url === url)));
+  }
+
   async function handleGenerateReport() {
     if (!initial?.id) return;
     setGeneratingReport(true);
@@ -1167,6 +1243,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
           : caseDetail,
         listDetails,
         docSlots,
+        bidNotes,
       ),
       caseDetailJson: caseDetail.available
         ? JSON.stringify(
@@ -1411,6 +1488,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
           "물건상세",
           "현황조사서",
           "서류",
+          "입찰가산정",
           "사진",
           "찬스의견",
           "추천입찰가",
@@ -1786,6 +1864,113 @@ export function AuctionForm({ initial }: AuctionFormProps) {
 
         <Section
           n={8}
+          title="입찰가산정 자료등록"
+          hint="슬롯별 파일 다건 첨부 + 텍스트 직접 입력/붙여넣기 가능 · PDF/PNG/JPG · Excel · CSV · Word · 한글(hwp/hwpx). 활용 방식은 추후 안내 예정입니다."
+        >
+          <input
+            ref={bidUploadRef}
+            type="file"
+            multiple
+            accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.csv,.xls,.xlsx,.doc,.docx,.hwp,.hwpx,image/*,application/pdf,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            className="hidden"
+            onChange={(e) => {
+              if (pendingBidType) void uploadBidValuationSlot(pendingBidType, e.target.files);
+              setPendingBidType(null);
+            }}
+          />
+          <div className="grid gap-3 md:grid-cols-2">
+            {BIDDING_VALUATION_SLOTS.map((slot) => {
+              const files = filesForSlot(attachments, slot.type);
+              const note = bidNotes[slot.type] ?? "";
+              const atLimit = files.length >= MAX_ATTACHMENTS_PER_SLOT;
+              const hasContent = files.length > 0 || Boolean(note.trim());
+              return (
+                <div key={slot.type} className="rounded-xl border border-white/10 bg-black/25 p-4">
+                  <div className="flex items-start gap-2">
+                    <FileText
+                      className={`h-5 w-5 shrink-0 ${hasContent ? "text-emerald-300" : "text-slate-500"}`}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-white">{slot.label}</p>
+                        <span className="text-[10px] tabular-nums text-slate-500">
+                          파일 {files.length}/{MAX_ATTACHMENTS_PER_SLOT}
+                        </span>
+                      </div>
+                      {files.length === 0 ? (
+                        <p className="mt-1 text-[11px] text-slate-600">파일 첨부 없음</p>
+                      ) : (
+                        <ul className="mt-2 max-h-28 space-y-1 overflow-y-auto">
+                          {files.map((file) => (
+                            <li
+                              key={`${file.url}-${file.name}`}
+                              className="flex items-center gap-1.5 text-[11px]"
+                            >
+                              <a
+                                href={file.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="min-w-0 flex-1 truncate text-[#4dabff] hover:underline"
+                              >
+                                {file.name}
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => removeAttachment(slot.type, file.url)}
+                                className="shrink-0 rounded border border-white/10 p-1 text-red-300 hover:bg-white/5"
+                                aria-label={`${file.name} 삭제`}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                  <label className="mt-3 block">
+                    <span className="mb-1 block text-[11px] text-slate-400">
+                      텍스트 입력 · 붙여넣기
+                    </span>
+                    <textarea
+                      className={`${inputClass} min-h-[88px] whitespace-pre-wrap text-[12px]`}
+                      value={note}
+                      onChange={(e) =>
+                        setBidNotes((prev) => ({ ...prev, [slot.type]: e.target.value }))
+                      }
+                      placeholder="시세·사례·메모 등을 직접 입력하거나 붙여넣으세요"
+                    />
+                    <span className="mt-0.5 block text-right text-[10px] text-slate-600">
+                      {note.length.toLocaleString("ko-KR")}자
+                    </span>
+                  </label>
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      disabled={bidSlotUploading === slot.type || atLimit}
+                      onClick={() => {
+                        setPendingBidType(slot.type);
+                        bidUploadRef.current?.click();
+                      }}
+                      className="w-full rounded-lg border border-white/10 py-1.5 text-[11px] text-slate-200 hover:bg-white/5 disabled:opacity-40"
+                    >
+                      {bidSlotUploading === slot.type
+                        ? "업로드…"
+                        : atLimit
+                          ? "파일 슬롯 한도 도달"
+                          : files.length
+                            ? "파일 추가 첨부"
+                            : "파일 첨부"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Section>
+
+        <Section
+          n={9}
           title="사진"
           hint="복수 첨부 가능 · 최대 8장 · 법원 불러오기 시 gen_pic 자동첨부"
         >
@@ -1849,7 +2034,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
           </div>
         </Section>
 
-        <Section n={9} title="찬스부동산 의견" hint="고객 안내용 · 권리분석과 별도 저장(memo)">
+        <Section n={10} title="찬스부동산 의견" hint="고객 안내용 · 권리분석과 별도 저장(memo)">
           <textarea
             className={`${inputClass} min-h-[140px]`}
             value={form.chanceOpinion}
@@ -1860,7 +2045,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
           <p className="mt-1 text-right text-[11px] text-slate-500">{form.chanceOpinion.length}/2000</p>
         </Section>
 
-        <Section n={10} title="추천입찰가격">
+        <Section n={11} title="추천입찰가격">
           <Field label="추천입찰가격 (원)">
             <input
               className={`${inputClass} max-w-md tabular-nums`}
@@ -1872,7 +2057,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
           </Field>
         </Section>
 
-        <Section n={11} title="낙찰결과">
+        <Section n={12} title="낙찰결과">
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="낙찰가격 (원)">
               <input
@@ -1912,7 +2097,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
 
         {isEdit && initial && (
           <Section
-            n={12}
+            n={13}
             title="분석 리포트"
             hint="DB 텍스트 + 서류 첨부(PDF/이미지)를 함께 분석합니다. 텍스트·PDF는 선택 모델, 이미지는 Nano Banana Pro로 사전 요약 후 합칩니다."
           >
@@ -1998,6 +2183,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
                   setParcels(parcelsFromListDetails(restoredLists));
                   setSchedule(scheduleFromRights(initial.rightsAnalysis ?? ""));
                   setDocSlots(docSlotsFromRights(initial.rightsAnalysis ?? ""));
+                  setBidNotes(bidNotesFromRights(initial.rightsAnalysis ?? ""));
                   setReportUrl(initial.reportUrl?.trim() || null);
                   setAutoKeys(new Set());
                   setFilled(true);
@@ -2012,6 +2198,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
                   setCaseDetail(emptyCaseDetail());
                   setListDetails([]);
                   setDocSlots(emptyDocSlots());
+                  setBidNotes(emptyBiddingValuationNotes());
                   setReportUrl(null);
                   setAutoKeys(new Set());
                   setFilled(false);

@@ -2,6 +2,8 @@ import { readFile } from "fs/promises";
 import path from "path";
 import {
   AUCTION_DOC_SLOTS,
+  courtDocAttachments,
+  isAuctionDocType,
   parseAuctionAttachments,
   type AuctionAttachment,
   type AuctionDocType,
@@ -104,12 +106,14 @@ export async function loadReportMediaParts(
   const parts: ReportMediaPart[] = [];
   const skipped: string[] = [];
 
-  for (const att of attachments) {
+  // 입찰가산정 자료는 리포트 Gemini 첨부에서 제외 (법원 서류 슬롯만)
+  for (const att of courtDocAttachments(attachments)) {
     if (parts.length >= MAX_FILES) {
       skipped.push(`${att.name || att.url} (최대 ${MAX_FILES}개)`);
       continue;
     }
     if (!att.url?.trim()) continue;
+    if (!isAuctionDocType(att.type)) continue;
 
     try {
       const { buffer, contentType } = await fetchBytes(att.url.trim());
