@@ -47,6 +47,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       const auction = await updateAuctionSupabase(id, {
         ...parsed.data,
         manageCode: existing.manageCode,
+        // body에 reportUrl이 없으면 기존 리포트 URL 유지 (수정 저장 시 유실 방지)
+        reportUrl:
+          body.reportUrl !== undefined ? parsed.data.reportUrl : existing.reportUrl,
       });
       scheduleNotifyMatchingSubscribers({
         entityType: "AUCTION",
@@ -62,7 +65,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     const auction = await prisma.auction.update({
       where: { id },
-      data: toAuctionCreateData({ ...parsed.data, manageCode: existing.manageCode }),
+      data: toAuctionCreateData({
+        ...parsed.data,
+        manageCode: existing.manageCode,
+        reportUrl:
+          body.reportUrl !== undefined ? parsed.data.reportUrl : existing.reportUrl,
+      }),
     });
     scheduleNotifyMatchingSubscribers({ entityType: "AUCTION", entity: auction });
     return NextResponse.json(auction);

@@ -149,6 +149,7 @@ export function AdminAuctionList({ items }: { items: Auction[] }) {
                 "최저가",
                 "매각기일",
                 "상태",
+                "리포트",
                 "관리",
               ].map((h) => (
                 <th
@@ -163,7 +164,7 @@ export function AdminAuctionList({ items }: { items: Auction[] }) {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={9} className="p-8 text-center text-sm text-landing-muted">
+                <td colSpan={10} className="p-8 text-center text-sm text-landing-muted">
                   검색 결과가 없습니다.
                 </td>
               </tr>
@@ -196,6 +197,20 @@ export function AdminAuctionList({ items }: { items: Auction[] }) {
                       {item.saleDate ? formatDateYmd(item.saleDate) : `D-${item.dDay}`}
                     </td>
                     <td className="p-3 text-center text-sm">{statusLabel(item.status)}</td>
+                    <td className="p-3 text-center">
+                      {item.reportUrl ? (
+                        <a
+                          href={item.reportUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-sm text-emerald-400 hover:underline"
+                        >
+                          보기
+                        </a>
+                      ) : (
+                        <span className="text-sm text-landing-muted">—</span>
+                      )}
+                    </td>
                     <td className="p-3 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <Link

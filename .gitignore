@@ -60,6 +60,8 @@ next-env.d.ts
 !/storage/uploads/properties/.gitkeep
 /storage/uploads/auctions/*
 !/storage/uploads/auctions/.gitkeep
+/storage/logs/*
+!/storage/logs/.gitkeep
 
 # OS / IDE / local tooling
 .idea/

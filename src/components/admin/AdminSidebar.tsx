@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { AppLink as Link } from "@/components/ui/AppLink";
 import { usePathname } from "next/navigation";
 import {
@@ -16,6 +17,7 @@ import {
   User,
   Users,
 } from "lucide-react";
+import { formatUsd } from "@/lib/gemini-usage-shared";
 
 const NAV = [
   { href: "/admin", label: "대시보드", Icon: LayoutDashboard },
@@ -35,6 +37,36 @@ type AdminSidebarProps = {
 
 export function AdminSidebar({ authEnabled }: AdminSidebarProps) {
   const pathname = usePathname();
+  const [geminiToday, setGeminiToday] = useState<{
+    totalCostUsd: number;
+    calls: number;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const res = await fetch("/api/admin/gemini-usage", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { totalCostUsd?: number; calls?: number };
+        if (!cancelled) {
+          setGeminiToday({
+            totalCostUsd: Number(data.totalCostUsd ?? 0),
+            calls: Number(data.calls ?? 0),
+          });
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    void load();
+    const onFocus = () => void load();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [pathname]);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -56,6 +88,18 @@ export function AdminSidebar({ authEnabled }: AdminSidebarProps) {
           <h1 className="text-sm font-bold tracking-tight text-landing-text">찬스 관리자</h1>
         </div>
         <p className="text-[11px] text-landing-muted opacity-80">관리 콘솔</p>
+        {geminiToday && (
+          <p
+            className="mt-2 rounded-lg border border-white/10 bg-black/25 px-2 py-1.5 text-[10px] leading-snug text-slate-300"
+            title="AI Studio 단가 기준 추정 · 실제 청구와 다를 수 있음"
+          >
+            오늘 Gemini{" "}
+            <span className="font-semibold text-[#d4bfff]">
+              {formatUsd(geminiToday.totalCostUsd)}
+            </span>
+            <span className="text-slate-500"> · {geminiToday.calls}회</span>
+          </p>
+        )}
         {!authEnabled && (
           <span className="mt-2 inline-block rounded bg-violet-500/20 px-2 py-0.5 text-[10px] font-bold text-violet-300">
             개발 · 인증 비활성

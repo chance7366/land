@@ -7,6 +7,7 @@ import {
 } from "@/lib/auction-attachments";
 import { isSupabaseEnabled } from "@/lib/supabase/config";
 import { listAllAuctionsAdminSupabase } from "@/lib/supabase/repos/admin-catalog";
+import { repairUtf8Mojibake } from "@/lib/text-encoding";
 
 export type AuctionInput = {
   manageCode?: string | null;
@@ -49,7 +50,7 @@ export type AuctionInput = {
 
 function strOrNull(v: unknown): string | null {
   if (v == null || v === "") return null;
-  return String(v);
+  return repairUtf8Mojibake(String(v));
 }
 
 function numOrNull(v: unknown): number | null {

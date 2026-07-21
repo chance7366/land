@@ -224,6 +224,19 @@ export async function updateAuctionSupabase(
   return mapAuctionRow(data);
 }
 
+/** report_url 컬럼만 갱신 (전체 AuctionInput 재전송 없음) */
+export async function patchAuctionReportUrlSupabase(id: string, reportUrl: string) {
+  const sb = createSupabaseAdminClient();
+  const { data, error } = await sb
+    .from("auctions")
+    .update({ report_url: reportUrl, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return mapAuctionRow(data);
+}
+
 export async function deleteAuctionSupabase(id: string) {
   const sb = createSupabaseAdminClient();
   const { error } = await sb.from("auctions").delete().eq("id", id);

@@ -1,5 +1,16 @@
 /** Supabase row → 앱(Prisma 형태) 매핑 */
 
+import { repairUtf8Mojibake, repairUtf8MojibakeNullable } from "@/lib/text-encoding";
+
+function s(v: unknown): string {
+  return repairUtf8Mojibake(String(v ?? ""));
+}
+
+function sn(v: unknown): string | null {
+  if (v == null) return null;
+  return repairUtf8MojibakeNullable(String(v)) ?? null;
+}
+
 export function mapPropertyRow(row: Record<string, unknown>) {
   return {
     id: String(row.id),
@@ -63,13 +74,20 @@ export function mapPropertyRow(row: Record<string, unknown>) {
 }
 
 export function mapAuctionRow(row: Record<string, unknown>) {
+  const caseDetailRaw =
+    row.case_detail_json == null
+      ? null
+      : typeof row.case_detail_json === "string"
+        ? row.case_detail_json
+        : JSON.stringify(row.case_detail_json);
+
   return {
     id: String(row.id),
-    manageCode: String(row.manage_code ?? ""),
-    caseNumber: String(row.case_number ?? ""),
+    manageCode: s(row.manage_code),
+    caseNumber: s(row.case_number),
     itemNo: Number(row.item_no ?? 1),
-    title: String(row.title ?? ""),
-    description: String(row.description ?? ""),
+    title: s(row.title),
+    description: s(row.description),
     appraisalPrice: Number(row.appraisal_price ?? 0),
     recommendedPrice: Number(row.recommended_price ?? 0),
     safetyGrade: String(row.safety_grade ?? "SAFE") as never,
@@ -77,31 +95,26 @@ export function mapAuctionRow(row: Record<string, unknown>) {
     dDay: Number(row.d_day ?? 0),
     images: JSON.stringify(row.images ?? []),
     reportUrl: (row.report_url as string | null) ?? null,
-    court: (row.court as string | null) ?? null,
+    court: sn(row.court),
     saleDate: row.sale_date ? new Date(String(row.sale_date)) : null,
-    address: (row.address as string | null) ?? null,
-    address2: (row.address2 as string | null) ?? null,
-    region: (row.region as string | null) ?? null,
-    auctionType: (row.auction_type as string | null) ?? null,
-    itemType: (row.item_type as string | null) ?? null,
-    auctionTarget: (row.auction_target as string | null) ?? null,
-    bidMethod: (row.bid_method as string | null) ?? null,
+    address: sn(row.address),
+    address2: sn(row.address2),
+    region: sn(row.region),
+    auctionType: sn(row.auction_type),
+    itemType: sn(row.item_type),
+    auctionTarget: sn(row.auction_target),
+    bidMethod: sn(row.bid_method),
     landArea: row.land_area == null ? null : Number(row.land_area),
     buildingArea: row.building_area == null ? null : Number(row.building_area),
     minPrice: row.min_price == null ? null : Number(row.min_price),
     bidDeposit: row.bid_deposit == null ? null : Number(row.bid_deposit),
     claimAmount: row.claim_amount == null ? null : Number(row.claim_amount),
-    debtorOwner: (row.debtor_owner as string | null) ?? null,
-    creditor: (row.creditor as string | null) ?? null,
+    debtorOwner: sn(row.debtor_owner),
+    creditor: sn(row.creditor),
     attachments: JSON.stringify(row.attachments ?? []),
-    rightsAnalysis: (row.rights_analysis as string | null) ?? null,
-    caseDetailJson:
-      row.case_detail_json == null
-        ? null
-        : typeof row.case_detail_json === "string"
-          ? row.case_detail_json
-          : JSON.stringify(row.case_detail_json),
-    memo: (row.memo as string | null) ?? null,
+    rightsAnalysis: sn(row.rights_analysis),
+    caseDetailJson: caseDetailRaw == null ? null : repairUtf8Mojibake(caseDetailRaw),
+    memo: sn(row.memo),
     winningPrice: row.winning_price == null ? null : Number(row.winning_price),
     winningRatio: row.winning_ratio == null ? null : Number(row.winning_ratio),
     bidderCount: row.bidder_count == null ? null : Number(row.bidder_count),

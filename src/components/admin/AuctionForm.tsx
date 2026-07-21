@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   CheckCircle2,
+  ExternalLink,
   FileText,
   ImagePlus,
   Loader2,
@@ -21,6 +22,7 @@ import { suggestAuctionTitle } from "@/lib/auction-title";
 import {
   type CourtAuctionFixture,
   type FormGroup,
+  type ScheduleRow,
   type StatusReport,
   COURT_OPTIONS,
   findFixturesByCase,
@@ -34,6 +36,13 @@ import {
   parseAuctionAttachments,
 } from "@/lib/auction-attachments";
 import { askManageCodeConflict, type ManageCodeConflictResponse } from "@/lib/manage-code-conflict";
+import {
+  AUCTION_REPORT_MODELS,
+  GEMINI_FLASH_MODEL,
+  type AuctionReportModelId,
+} from "@/lib/auction-report-models";
+import { formatUsd } from "@/lib/gemini-usage-shared";
+import { repairUtf8Mojibake } from "@/lib/text-encoding";
 import {
   StatusReportSection,
   emptyStatusReport,
@@ -109,6 +118,37 @@ type DocSlotState = {
   /** court: available on court site but file not auto-pulled yet */
   courtStatus: "none" | "available" | "unavailable";
 };
+
+function emptyDocSlots(): DocSlotState[] {
+  return AUCTION_DOC_SLOTS.map((s) => ({ type: s.type, courtStatus: "none" as const }));
+}
+
+function docSlotsFromRights(text: string): DocSlotState[] {
+  const raw = sectionFromRights(text, "서류슬롯JSON");
+  const base = emptyDocSlots();
+  if (!raw) return base;
+  try {
+    const parsed = JSON.parse(raw) as DocSlotState[];
+    if (!Array.isArray(parsed)) return base;
+    return base.map((slot) => {
+      const hit = parsed.find((p) => p?.type === slot.type);
+      if (!hit) return slot;
+      const st = hit.courtStatus;
+      if (st === "available" || st === "unavailable" || st === "none") {
+        return { type: slot.type, courtStatus: st };
+      }
+      return slot;
+    });
+  } catch {
+    return base;
+  }
+}
+
+function parseLandShare(text: string): { denom: string; numer: string } {
+  const raw = sectionFromRights(text, "대지권");
+  const m = raw.match(/(\d+)\s*분의\s*(\d+)/);
+  return { denom: m?.[1] ?? "", numer: m?.[2] ?? "" };
+}
 
 function formatMoneyDisplay(raw: string): string {
   const digits = String(raw).replace(/[^\d]/g, "");
@@ -264,8 +304,9 @@ function inferFormGroup(auction: Auction): FormGroup {
 }
 
 function sectionFromRights(text: string, key: string): string {
+  const normalized = repairUtf8Mojibake(text || "");
   const re = new RegExp(`\\[${key}\\]\\s*([\\s\\S]*?)(?=\\n\\n\\[|$)`);
-  const m = text.match(re);
+  const m = normalized.match(re);
   return m?.[1]?.trim() ?? "";
 }
 
@@ -297,25 +338,41 @@ function cloneStatusReport(report: StatusReport): StatusReport {
 function auctionToForm(auction?: Auction): FormState {
   if (!auction) return emptyForm();
   const { year, serial } = parseCaseParts(auction.caseNumber);
-  const rights = auction.rightsAnalysis ?? "";
+  const rights = repairUtf8Mojibake(auction.rightsAnalysis ?? "");
   const group = inferFormGroup(auction);
+  const caseDetail = loadCaseDetail(auction);
+  const landShare = parseLandShare(rights);
+  const metaRaw = sectionFromRights(rights, "등록메타JSON");
+  let meta: Partial<FormState> = {};
+  if (metaRaw) {
+    try {
+      meta = JSON.parse(metaRaw) as Partial<FormState>;
+    } catch {
+      meta = {};
+    }
+  }
+  const [addr1, addr2] = splitStoredAddress(
+    repairUtf8Mojibake(auction.address ?? ""),
+    repairUtf8Mojibake(auction.address2 ?? ""),
+  );
   return {
     ...emptyForm(),
-    court: auction.court ?? "대구지방법원",
+    court: repairUtf8Mojibake(auction.court ?? "대구지방법원"),
     caseYear: year,
     caseSerial: serial,
     caseTail: formatCaseTail(serial, auction.itemNo ?? null),
-    caseNumber: auction.caseNumber,
+    caseNumber: repairUtf8Mojibake(auction.caseNumber),
     itemNo: auction.itemNo ?? null,
-    formGroup: group,
-    itemType: auction.itemType ?? "",
-    auctionType: auction.auctionType ?? "",
-    auctionTarget: auction.auctionTarget ?? "",
-    title: auction.title,
-    region: auction.region ?? "",
-    address: splitStoredAddress(auction.address, auction.address2)[0],
-    address2: splitStoredAddress(auction.address, auction.address2)[1],
+    formGroup: (meta.formGroup as FormGroup | "") || group,
+    itemType: repairUtf8Mojibake(auction.itemType ?? ""),
+    auctionType: repairUtf8Mojibake(auction.auctionType ?? ""),
+    auctionTarget: repairUtf8Mojibake(auction.auctionTarget ?? ""),
+    title: repairUtf8Mojibake(auction.title),
+    region: repairUtf8Mojibake(auction.region ?? ""),
+    address: addr1,
+    address2: addr2,
     saleDate: auction.saleDate ? new Date(auction.saleDate).toISOString().slice(0, 10) : "",
+    saleDateLabel: String(meta.saleDateLabel || ""),
     appraisalPrice: auction.appraisalPrice != null ? String(Math.round(auction.appraisalPrice)) : "",
     minPrice: auction.minPrice != null ? String(Math.round(auction.minPrice)) : "",
     bidDeposit: auction.bidDeposit != null ? String(Math.round(auction.bidDeposit)) : "",
@@ -328,16 +385,27 @@ function auctionToForm(auction?: Auction): FormState {
     secondBidAmount:
       auction.secondBidAmount != null ? String(Math.round(auction.secondBidAmount)) : "",
     bidMethod: auction.bidMethod ?? "기일입찰",
+    receivedAt:
+      String(meta.receivedAt || "") || caseDetail.basic.receivedAt || "",
+    startedAt: String(meta.startedAt || "") || caseDetail.basic.startedAt || "",
+    dividendDeadline:
+      String(meta.dividendDeadline || "") ||
+      caseDetail.dividendDeadlines[0]?.deadline ||
+      "",
     remarks: sectionFromRights(rights, "물건비고") || "",
-    appraisalSummary: sectionFromRights(rights, "감정요약") || auction.description || "",
+    appraisalSummary:
+      sectionFromRights(rights, "감정요약") ||
+      repairUtf8Mojibake(auction.description || ""),
     possessionNote: sectionFromRights(rights, "점유"),
     leaseNote: sectionFromRights(rights, "임차"),
     assumeRightsNote: sectionFromRights(rights, "매수인 인수 권리"),
     saleShare: sectionFromRights(rights, "매각지분"),
     exclusiveArea: group === "UNIT" && auction.buildingArea != null ? String(auction.buildingArea) : "",
+    landShareDenom: landShare.denom,
+    landShareNumer: landShare.numer,
     landArea: auction.landArea != null ? String(auction.landArea) : "",
     buildingArea: group !== "UNIT" && auction.buildingArea != null ? String(auction.buildingArea) : "",
-    chanceOpinion: auction.memo ?? "",
+    chanceOpinion: repairUtf8Mojibake(auction.memo ?? ""),
     safetyGrade: auction.safetyGrade,
     status: auction.status,
     featured: auction.featured,
@@ -435,13 +503,86 @@ function loadListDetails(auction?: Auction, caseDetail?: CaseDetail): AuctionLis
   return [];
 }
 
+function parcelsFromListDetails(
+  rows: AuctionListDetailRow[],
+): CourtAuctionFixture["parcels"] {
+  return rows.map((r) => ({
+    no: r.no,
+    listKind: r.listKind,
+    address: firstAddressFromDetail(r.detail),
+    detail: r.detail,
+  }));
+}
+
+function scheduleFromRights(text: string): ScheduleRow[] {
+  const jsonRaw = sectionFromRights(text, "기일내역JSON");
+  if (jsonRaw) {
+    try {
+      const parsed = JSON.parse(jsonRaw) as ScheduleRow[];
+      if (Array.isArray(parsed) && parsed.length) {
+        return parsed
+          .filter((r) => r && typeof r === "object")
+          .map((r) => ({
+            date: String(r.date || ""),
+            kind: String(r.kind || ""),
+            place: String(r.place || ""),
+            minPrice:
+              r.minPrice == null || Number.isNaN(Number(r.minPrice))
+                ? null
+                : Number(r.minPrice),
+            result: String(r.result || ""),
+          }));
+      }
+    } catch {
+      /* fall through to text */
+    }
+  }
+
+  const lines = sectionFromRights(text, "기일내역");
+  if (!lines) return [];
+  return lines
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const m = line.match(
+        /^(\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2})\s+(\S+)\s*(?:([\d,]+)원)?\s*(.*)$/,
+      );
+      if (!m) {
+        return { date: line, kind: "", place: "", minPrice: null, result: "" };
+      }
+      return {
+        date: m[1],
+        kind: m[2],
+        place: "",
+        minPrice: m[3] ? Number(m[3].replace(/,/g, "")) : null,
+        result: (m[4] || "").trim(),
+      };
+    });
+}
+
 function buildRightsAnalysis(
   form: FormState,
-  scheduleLines: string,
+  schedule: ScheduleRow[],
   statusReport?: StatusReport,
   caseDetail?: CaseDetail,
   listDetails?: AuctionListDetailRow[],
+  docSlots?: DocSlotState[],
 ): string {
+  const scheduleLines = schedule
+    .map(
+      (s) =>
+        `${s.date} ${s.kind} ${s.minPrice != null ? `${s.minPrice.toLocaleString("ko-KR")}원` : ""} ${s.result}`.trim(),
+    )
+    .join("\n");
+  const meta = {
+    formGroup: form.formGroup || "",
+    saleDateLabel: form.saleDateLabel || "",
+    receivedAt: form.receivedAt || "",
+    startedAt: form.startedAt || "",
+    dividendDeadline: form.dividendDeadline || "",
+  };
+  const hasMeta = Object.values(meta).some((v) => Boolean(v));
   const lines = [
     form.appraisalSummary ? `[감정요약] ${form.appraisalSummary}` : "",
     form.possessionNote ? `[점유] ${form.possessionNote}` : "",
@@ -449,6 +590,7 @@ function buildRightsAnalysis(
     form.assumeRightsNote ? `[매수인 인수 권리] ${form.assumeRightsNote}` : "",
     form.saleShare ? `[매각지분] ${form.saleShare}` : "",
     form.remarks.trim() ? `[물건비고]\n${form.remarks.trim()}` : "",
+    schedule.length ? `[기일내역JSON]\n${JSON.stringify(schedule)}` : "",
     scheduleLines ? `[기일내역]\n${scheduleLines}` : "",
     form.landShareDenom && form.landShareNumer
       ? `[대지권] ${form.landShareDenom}분의 ${form.landShareNumer}`
@@ -462,6 +604,8 @@ function buildRightsAnalysis(
     caseDetail?.available
       ? `[사건상세JSON]\n${JSON.stringify(caseDetail)}`
       : "",
+    docSlots?.length ? `[서류슬롯JSON]\n${JSON.stringify(docSlots)}` : "",
+    hasMeta ? `[등록메타JSON]\n${JSON.stringify(meta)}` : "",
   ].filter(Boolean);
   return lines.join("\n\n");
 }
@@ -547,17 +691,23 @@ type AuctionFormProps = { initial?: Auction };
 export function AuctionForm({ initial }: AuctionFormProps) {
   const isEdit = Boolean(initial);
   const [form, setForm] = useState<FormState>(() => auctionToForm(initial));
-  const [parcels, setParcels] = useState<CourtAuctionFixture["parcels"]>([]);
-  const [schedule, setSchedule] = useState<CourtAuctionFixture["schedule"]>([]);
+  const [caseDetail, setCaseDetail] = useState<CaseDetail>(() => loadCaseDetail(initial));
+  const [listDetails, setListDetails] = useState<AuctionListDetailRow[]>(() => {
+    const detail = loadCaseDetail(initial);
+    return loadListDetails(initial, detail);
+  });
+  const [parcels, setParcels] = useState<CourtAuctionFixture["parcels"]>(() => {
+    const detail = loadCaseDetail(initial);
+    return parcelsFromListDetails(loadListDetails(initial, detail));
+  });
+  const [schedule, setSchedule] = useState<CourtAuctionFixture["schedule"]>(() =>
+    scheduleFromRights(initial?.rightsAnalysis ?? ""),
+  );
   const [statusReport, setStatusReport] = useState<StatusReport>(() =>
     statusReportFromRights(initial?.rightsAnalysis ?? ""),
   );
-  const [caseDetail, setCaseDetail] = useState<CaseDetail>(() => loadCaseDetail(initial));
-  const [listDetails, setListDetails] = useState<AuctionListDetailRow[]>(() =>
-    loadListDetails(initial, loadCaseDetail(initial)),
-  );
   const [docSlots, setDocSlots] = useState<DocSlotState[]>(() =>
-    AUCTION_DOC_SLOTS.map((s) => ({ type: s.type, courtStatus: "none" as const })),
+    docSlotsFromRights(initial?.rightsAnalysis ?? ""),
   );
   const [images, setImages] = useState<string[]>(() => parseImages(initial?.images || "[]"));
   const [attachments, setAttachments] = useState<AuctionAttachment[]>(() =>
@@ -575,6 +725,12 @@ export function AuctionForm({ initial }: AuctionFormProps) {
   const [filled, setFilled] = useState(Boolean(initial));
   const photoRef = useRef<HTMLInputElement>(null);
   const [pendingDocType, setPendingDocType] = useState<AuctionDocType | null>(null);
+  const [reportUrl, setReportUrl] = useState<string | null>(
+    () => initial?.reportUrl?.trim() || null,
+  );
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [reportModel, setReportModel] = useState<AuctionReportModelId>(GEMINI_FLASH_MODEL);
+
   function setMoneyField(key: keyof FormState, value: string) {
     setField(key, moneyDigits(value) as FormState[typeof key]);
   }
@@ -616,7 +772,6 @@ export function AuctionForm({ initial }: AuctionFormProps) {
       });
     }
     setForm(next);
-    setParcels(f.parcels.slice(0, 2));
     setSchedule(f.schedule);
     if (f.statusReport?.available) {
       setStatusReport(cloneStatusReport(f.statusReport));
@@ -628,13 +783,17 @@ export function AuctionForm({ initial }: AuctionFormProps) {
     } else {
       setCaseDetail(emptyCaseDetail(f.court));
     }
-    if (f.listDetails?.length) {
-      setListDetails(f.listDetails.map((r) => ({ ...r })));
-    } else if (f.caseDetail?.lists?.length) {
-      setListDetails(listDetailsFromCaseDetail(f.caseDetail));
-    } else {
-      setListDetails([]);
-    }
+    const nextLists = f.listDetails?.length
+      ? f.listDetails.map((r) => ({ ...r }))
+      : f.caseDetail?.lists?.length
+        ? listDetailsFromCaseDetail(f.caseDetail)
+        : [];
+    setListDetails(nextLists);
+    setParcels(
+      nextLists.length
+        ? parcelsFromListDetails(nextLists)
+        : f.parcels.slice(0, 6),
+    );
     if (f.courtImages?.length) {
       setImages(f.courtImages.slice(0, MAX_IMAGES));
     }
@@ -876,6 +1035,55 @@ export function AuctionForm({ initial }: AuctionFormProps) {
     }
   }
 
+  async function handleGenerateReport() {
+    if (!initial?.id) return;
+    setGeneratingReport(true);
+    setError("");
+    const modelLabel =
+      AUCTION_REPORT_MODELS.find((m) => m.id === reportModel)?.label ?? reportModel;
+    try {
+      const res = await fetch(`/api/admin/auctions/${initial.id}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: reportModel }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        reportUrl?: string;
+        mediaCount?: number;
+        imageModelUsed?: boolean;
+        imageModelNote?: string;
+        usage?: {
+          inputTokens?: number;
+          outputTokens?: number;
+          totalCostUsd?: number;
+        };
+      };
+      if (!res.ok) {
+        setError(data.error ?? "분석 리포트 생성에 실패했습니다.");
+        return;
+      }
+      if (data.reportUrl) {
+        setReportUrl(data.reportUrl);
+        const cost =
+          data.usage?.totalCostUsd != null
+            ? ` · 이번 ${formatUsd(data.usage.totalCostUsd)} (in ${data.usage.inputTokens ?? 0} / out ${data.usage.outputTokens ?? 0})`
+            : "";
+        const media =
+          data.mediaCount != null && data.mediaCount > 0
+            ? ` · 첨부 ${data.mediaCount}건${data.imageModelUsed ? " · 이미지모델" : ""}`
+            : "";
+        setToast(`분석 리포트 PDF 생성 완료 (${modelLabel})${media}${cost}`);
+      } else {
+        setError("리포트 URL을 받지 못했습니다.");
+      }
+    } catch {
+      setError("분석 리포트 생성 중 오류가 발생했습니다.");
+    } finally {
+      setGeneratingReport(false);
+    }
+  }
+
   async function handleSave() {
     setSaving(true);
     setError("");
@@ -911,13 +1119,6 @@ export function AuctionForm({ initial }: AuctionFormProps) {
       });
     }
 
-    const scheduleLines = schedule
-      .map(
-        (s) =>
-          `${s.date} ${s.kind} ${s.minPrice != null ? `${s.minPrice.toLocaleString("ko-KR")}원` : ""} ${s.result}`.trim(),
-      )
-      .join("\n");
-
     const payload = {
       caseNumber,
       itemNo: form.itemNo != null && form.itemNo > 0 ? form.itemNo : 1,
@@ -947,9 +1148,11 @@ export function AuctionForm({ initial }: AuctionFormProps) {
       secondBidAmount: moneyDigits(form.secondBidAmount)
         ? Number(moneyDigits(form.secondBidAmount))
         : null,
+      /** 분석 리포트 URL — 미포함 시 서버가 null로 덮어쓰지 않도록 항상 전송 */
+      reportUrl: reportUrl || null,
       rightsAnalysis: buildRightsAnalysis(
         form,
-        scheduleLines,
+        schedule,
         statusReport,
         caseDetail.available && listDetails.length
           ? {
@@ -963,6 +1166,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
             }
           : caseDetail,
         listDetails,
+        docSlots,
       ),
       caseDetailJson: caseDetail.available
         ? JSON.stringify(
@@ -1338,7 +1542,9 @@ export function AuctionForm({ initial }: AuctionFormProps) {
             </div>
           ) : (
             <p className="text-sm text-slate-500">
-              불러오기 후 기일내역이 표시됩니다.
+              {isEdit
+                ? "저장된 기일내역이 없습니다. 법원 불러오기로 다시 채울 수 있습니다."
+                : "불러오기 후 기일내역이 표시됩니다."}
             </p>
           )}
         </Section>
@@ -1352,7 +1558,9 @@ export function AuctionForm({ initial }: AuctionFormProps) {
             <ListDetailsPanel rows={listDetails} />
           ) : (
             <p className="text-sm text-slate-500">
-              불러오기 후 목록내역이 표시됩니다.
+              {isEdit
+                ? "저장된 목록내역이 없습니다. 법원 불러오기로 다시 채울 수 있습니다."
+                : "불러오기 후 목록내역이 표시됩니다."}
             </p>
           )}
         </Section>
@@ -1503,7 +1711,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
         <Section
           n={7}
           title="서류 첨부"
-          hint="법원 PDF 자동 다운로드는 아직 연동 전입니다. 제공 여부는 불러오기 시 표시되며, 파일은 슬롯별 수동 첨부(이미지/PDF)하세요."
+          hint="법원 PDF 자동 다운로드는 아직 연동 전입니다. 제공 여부는 불러오기·저장 후 수정 화면에서도 유지되며, 파일은 슬롯별 수동 첨부(이미지/PDF)하세요."
         >
           <input
             ref={slotUploadRef}
@@ -1701,6 +1909,65 @@ export function AuctionForm({ initial }: AuctionFormProps) {
             </Field>
           </div>
         </Section>
+
+        {isEdit && initial && (
+          <Section
+            n={12}
+            title="분석 리포트"
+            hint="DB 텍스트 + 서류 첨부(PDF/이미지)를 함께 분석합니다. 텍스트·PDF는 선택 모델, 이미지는 Nano Banana Pro로 사전 요약 후 합칩니다."
+          >
+            <div className="mb-3 max-w-md">
+              <label className="block text-xs text-slate-400">
+                텍스트·PDF 분석 모델
+                <select
+                  className={`${inputClass} mt-1`}
+                  value={reportModel}
+                  disabled={generatingReport}
+                  onChange={(e) => setReportModel(e.target.value as AuctionReportModelId)}
+                >
+                  {AUCTION_REPORT_MODELS.filter((m) => m.textReport).map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label} — {m.hint}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="mt-1 text-[11px] text-slate-500">
+                서류 슬롯의 PNG 등은 <span className="text-slate-300">gemini-3-pro-image-preview</span>
+                (Nano Banana Pro)로 먼저 읽고, PDF·본문 분석은 위에서 고른 모델로 진행합니다. 이미지
+                모델이 실패하면 선택 모델이 이미지까지 함께 봅니다.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                disabled={generatingReport}
+                onClick={() => void handleGenerateReport()}
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#4dabff] to-[#913dff] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {generatingReport ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                {generatingReport ? "리포트 생성 중…" : "분석 리포트 생성"}
+              </button>
+              {reportUrl ? (
+                <a
+                  href={reportUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-200 hover:bg-emerald-500/20"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  리포트 보기
+                </a>
+              ) : (
+                <span className="text-xs text-slate-500">저장된 리포트 없음</span>
+              )}
+            </div>
+          </Section>
+        )}
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-[#0B0F19]/92 px-4 py-3 backdrop-blur-md md:left-[var(--admin-sidebar-w,0px)]">
@@ -1723,15 +1990,15 @@ export function AuctionForm({ initial }: AuctionFormProps) {
                   setForm(auctionToForm(initial));
                   setImages(parseImages(initial.images || "[]"));
                   setAttachments(parseAuctionAttachments(initial.attachments || "[]"));
-                  setParcels([]);
-                  setSchedule([]);
                   setStatusReport(statusReportFromRights(initial.rightsAnalysis ?? ""));
                   const restoredCase = loadCaseDetail(initial);
+                  const restoredLists = loadListDetails(initial, restoredCase);
                   setCaseDetail(restoredCase);
-                  setListDetails(loadListDetails(initial, restoredCase));
-                  setDocSlots(
-                    AUCTION_DOC_SLOTS.map((s) => ({ type: s.type, courtStatus: "none" as const })),
-                  );
+                  setListDetails(restoredLists);
+                  setParcels(parcelsFromListDetails(restoredLists));
+                  setSchedule(scheduleFromRights(initial.rightsAnalysis ?? ""));
+                  setDocSlots(docSlotsFromRights(initial.rightsAnalysis ?? ""));
+                  setReportUrl(initial.reportUrl?.trim() || null);
                   setAutoKeys(new Set());
                   setFilled(true);
                   setToast("원본으로 되돌렸습니다.");
@@ -1744,9 +2011,8 @@ export function AuctionForm({ initial }: AuctionFormProps) {
                   setStatusReport(emptyStatusReport());
                   setCaseDetail(emptyCaseDetail());
                   setListDetails([]);
-                  setDocSlots(
-                    AUCTION_DOC_SLOTS.map((s) => ({ type: s.type, courtStatus: "none" as const })),
-                  );
+                  setDocSlots(emptyDocSlots());
+                  setReportUrl(null);
                   setAutoKeys(new Set());
                   setFilled(false);
                   setToast("초기화했습니다.");
