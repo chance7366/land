@@ -26,6 +26,7 @@ export async function markdownToPdfBuffer(
 ): Promise<Buffer> {
   const cleaned = stripRedundantReportH1(markdown);
   const bodyHtml = enhanceReportHtml(await marked.parse(cleaned, { async: true }));
+  const generatedAt = new Date().toLocaleString("ko-KR");
   const html = `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -34,11 +35,12 @@ export async function markdownToPdfBuffer(
   <style>${REPORT_PDF_CSS}</style>
 </head>
 <body>
-  <p class="meta" style="margin-bottom:4px;font-size:8.5pt;letter-spacing:0.18em;font-weight:600;color:#A08B78;">
-    PREMIUM RIGHTS ANALYSIS
-  </p>
-  <h1>${escapeHtml(title)}</h1>
-  <p class="meta">생성일시: ${escapeHtml(new Date().toLocaleString("ko-KR"))}</p>
+  <p class="generated-at">생성일시 : ${escapeHtml(generatedAt)}</p>
+  <header class="report-cover">
+    <p class="eyebrow">PREMIUM RIGHTS ANALYSIS</p>
+    <h1>${escapeHtml(title)}</h1>
+    <p class="ai-notice">본 보고서는 찬스부동산의 경매물건 정보에 기반한 AI로 생성한 보고서 입니다.</p>
+  </header>
   ${bodyHtml}
 </body>
 </html>`;

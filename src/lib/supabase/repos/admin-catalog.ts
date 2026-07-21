@@ -104,6 +104,7 @@ export function auctionInputToRow(input: AuctionInput & { manageCode: string }) 
     second_bid_amount:
       input.secondBidAmount != null ? Number(input.secondBidAmount) : null,
     report_url: input.reportUrl ?? null,
+    general_report_url: input.generalReportUrl ?? null,
     sale_date: saleIso,
     featured: Boolean(input.featured),
     published_at: new Date().toISOString(),
@@ -224,12 +225,20 @@ export async function updateAuctionSupabase(
   return mapAuctionRow(data);
 }
 
-/** report_url 컬럼만 갱신 (전체 AuctionInput 재전송 없음) */
-export async function patchAuctionReportUrlSupabase(id: string, reportUrl: string) {
+/** report_url / general_report_url 만 갱신 (전체 AuctionInput 재전송 없음) */
+export async function patchAuctionReportUrlSupabase(
+  id: string,
+  reportUrl: string,
+  kind: "general" | "member" = "member",
+) {
   const sb = createSupabaseAdminClient();
+  const patch =
+    kind === "general"
+      ? { general_report_url: reportUrl, updated_at: new Date().toISOString() }
+      : { report_url: reportUrl, updated_at: new Date().toISOString() };
   const { data, error } = await sb
     .from("auctions")
-    .update({ report_url: reportUrl, updated_at: new Date().toISOString() })
+    .update(patch)
     .eq("id", id)
     .select("*")
     .single();

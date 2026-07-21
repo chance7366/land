@@ -47,9 +47,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       const auction = await updateAuctionSupabase(id, {
         ...parsed.data,
         manageCode: existing.manageCode,
-        // body에 reportUrl이 없으면 기존 리포트 URL 유지 (수정 저장 시 유실 방지)
+        // body에 리포트 URL이 없으면 기존 값 유지 (수정 저장 시 유실 방지)
         reportUrl:
           body.reportUrl !== undefined ? parsed.data.reportUrl : existing.reportUrl,
+        generalReportUrl:
+          body.generalReportUrl !== undefined
+            ? parsed.data.generalReportUrl
+            : (existing as { generalReportUrl?: string | null }).generalReportUrl ?? null,
       });
       scheduleNotifyMatchingSubscribers({
         entityType: "AUCTION",
@@ -70,6 +74,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         manageCode: existing.manageCode,
         reportUrl:
           body.reportUrl !== undefined ? parsed.data.reportUrl : existing.reportUrl,
+        generalReportUrl:
+          body.generalReportUrl !== undefined
+            ? parsed.data.generalReportUrl
+            : existing.generalReportUrl,
       }),
     });
     scheduleNotifyMatchingSubscribers({ entityType: "AUCTION", entity: auction });

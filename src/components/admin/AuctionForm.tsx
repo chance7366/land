@@ -50,6 +50,8 @@ import { askManageCodeConflict, type ManageCodeConflictResponse } from "@/lib/ma
 import {
   AUCTION_REPORT_MODELS,
   GEMINI_FLASH_MODEL,
+  reportKindLabel,
+  type AuctionReportKind,
   type AuctionReportModelId,
 } from "@/lib/auction-report-models";
 import { formatUsd } from "@/lib/gemini-usage-shared";
@@ -750,11 +752,22 @@ export function AuctionForm({ initial }: AuctionFormProps) {
   const [filled, setFilled] = useState(Boolean(initial));
   const photoRef = useRef<HTMLInputElement>(null);
   const [pendingDocType, setPendingDocType] = useState<AuctionDocType | null>(null);
-  const [reportUrl, setReportUrl] = useState<string | null>(
+  /** 회원리포트 URL (기존 reportUrl) */
+  const [memberReportUrl, setMemberReportUrl] = useState<string | null>(
     () => initial?.reportUrl?.trim() || null,
   );
-  const [generatingReport, setGeneratingReport] = useState(false);
-  const [reportModel, setReportModel] = useState<AuctionReportModelId>(GEMINI_FLASH_MODEL);
+  const [generalReportUrl, setGeneralReportUrl] = useState<string | null>(
+    () =>
+      (initial as { generalReportUrl?: string | null } | undefined)?.generalReportUrl?.trim() ||
+      null,
+  );
+  const [generatingReportKind, setGeneratingReportKind] = useState<AuctionReportKind | null>(
+    null,
+  );
+  const [generalReportModel, setGeneralReportModel] =
+    useState<AuctionReportModelId>(GEMINI_FLASH_MODEL);
+  const [memberReportModel, setMemberReportModel] =
+    useState<AuctionReportModelId>(GEMINI_FLASH_MODEL);
 
   function setMoneyField(key: keyof FormState, value: string) {
     setField(key, moneyDigits(value) as FormState[typeof key]);
@@ -1111,21 +1124,23 @@ export function AuctionForm({ initial }: AuctionFormProps) {
     setAttachments((list) => list.filter((a) => !(a.type === type && a.url === url)));
   }
 
-  async function handleGenerateReport() {
+  async function handleGenerateReport(kind: AuctionReportKind) {
     if (!initial?.id) return;
-    setGeneratingReport(true);
+    setGeneratingReportKind(kind);
     setError("");
-    const modelLabel =
-      AUCTION_REPORT_MODELS.find((m) => m.id === reportModel)?.label ?? reportModel;
+    const model = kind === "general" ? generalReportModel : memberReportModel;
+    const modelLabel = AUCTION_REPORT_MODELS.find((m) => m.id === model)?.label ?? model;
+    const kindLabel = reportKindLabel(kind);
     try {
       const res = await fetch(`/api/admin/auctions/${initial.id}/report`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: reportModel }),
+        body: JSON.stringify({ model, kind }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
         reportUrl?: string;
+        kind?: AuctionReportKind;
         mediaCount?: number;
         imageModelUsed?: boolean;
         imageModelNote?: string;
@@ -1136,11 +1151,12 @@ export function AuctionForm({ initial }: AuctionFormProps) {
         };
       };
       if (!res.ok) {
-        setError(data.error ?? "분석 리포트 생성에 실패했습니다.");
+        setError(data.error ?? `${kindLabel} 생성에 실패했습니다.`);
         return;
       }
       if (data.reportUrl) {
-        setReportUrl(data.reportUrl);
+        if (kind === "general") setGeneralReportUrl(data.reportUrl);
+        else setMemberReportUrl(data.reportUrl);
         const cost =
           data.usage?.totalCostUsd != null
             ? ` · 이번 ${formatUsd(data.usage.totalCostUsd)} (in ${data.usage.inputTokens ?? 0} / out ${data.usage.outputTokens ?? 0})`
@@ -1149,14 +1165,14 @@ export function AuctionForm({ initial }: AuctionFormProps) {
           data.mediaCount != null && data.mediaCount > 0
             ? ` · 첨부 ${data.mediaCount}건${data.imageModelUsed ? " · 이미지모델" : ""}`
             : "";
-        setToast(`분석 리포트 PDF 생성 완료 (${modelLabel})${media}${cost}`);
+        setToast(`${kindLabel} PDF 생성 완료 (${modelLabel})${media}${cost}`);
       } else {
         setError("리포트 URL을 받지 못했습니다.");
       }
     } catch {
-      setError("분석 리포트 생성 중 오류가 발생했습니다.");
+      setError(`${kindLabel} 생성 중 오류가 발생했습니다.`);
     } finally {
-      setGeneratingReport(false);
+      setGeneratingReportKind(null);
     }
   }
 
@@ -1224,8 +1240,9 @@ export function AuctionForm({ initial }: AuctionFormProps) {
       secondBidAmount: moneyDigits(form.secondBidAmount)
         ? Number(moneyDigits(form.secondBidAmount))
         : null,
-      /** 분석 리포트 URL — 미포함 시 서버가 null로 덮어쓰지 않도록 항상 전송 */
-      reportUrl: reportUrl || null,
+      /** 리포트 URL — 미포함 시 서버가 null로 덮어쓰지 않도록 항상 전송 */
+      reportUrl: memberReportUrl || null,
+      generalReportUrl: generalReportUrl || null,
       rightsAnalysis: buildRightsAnalysis(
         form,
         schedule,
@@ -1488,7 +1505,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
           "물건상세",
           "현황조사서",
           "서류",
-          "입찰가산정",
+          "적정가치평가",
           "사진",
           "찬스의견",
           "추천입찰가",
@@ -1864,7 +1881,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
 
         <Section
           n={8}
-          title="입찰가산정 자료등록"
+          title="적정가치평가"
           hint="슬롯별 파일 다건 첨부 + 텍스트 직접 입력/붙여넣기 가능 · PDF/PNG/JPG · TXT · Excel · CSV · Word · 한글(hwp/hwpx). 활용 방식은 추후 안내 예정입니다."
         >
           <input
@@ -1938,7 +1955,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
                       onChange={(e) =>
                         setBidNotes((prev) => ({ ...prev, [slot.type]: e.target.value }))
                       }
-                      placeholder="시세·사례·메모 등을 직접 입력하거나 붙여넣으세요"
+                      placeholder={slot.placeholder}
                     />
                     <span className="mt-0.5 block text-right text-[10px] text-slate-600">
                       {note.length.toLocaleString("ko-KR")}자
@@ -2099,57 +2116,125 @@ export function AuctionForm({ initial }: AuctionFormProps) {
           <Section
             n={13}
             title="분석 리포트"
-            hint="DB 텍스트 + 서류 첨부(PDF/이미지)를 함께 분석합니다. 텍스트·PDF는 선택 모델, 이미지는 Nano Banana Pro로 사전 요약 후 합칩니다."
+            hint="일반리포트(1~3)와 회원리포트(1~7)를 분리 생성·관리합니다. 텍스트·PDF는 종류별 선택 모델, 이미지는 Nano Banana Pro로 사전 요약합니다."
           >
-            <div className="mb-3 max-w-md">
-              <label className="block text-xs text-slate-400">
-                텍스트·PDF 분석 모델
-                <select
-                  className={`${inputClass} mt-1`}
-                  value={reportModel}
-                  disabled={generatingReport}
-                  onChange={(e) => setReportModel(e.target.value as AuctionReportModelId)}
-                >
-                  {AUCTION_REPORT_MODELS.filter((m) => m.textReport).map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.label} — {m.hint}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <p className="mt-1 text-[11px] text-slate-500">
-                서류 슬롯의 PNG 등은 <span className="text-slate-300">gemini-3-pro-image-preview</span>
-                (Nano Banana Pro)로 먼저 읽고, PDF·본문 분석은 위에서 고른 모델로 진행합니다. 이미지
-                모델이 실패하면 선택 모델이 이미지까지 함께 봅니다.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                disabled={generatingReport}
-                onClick={() => void handleGenerateReport()}
-                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#4dabff] to-[#913dff] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
-              >
-                {generatingReport ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4" />
-                )}
-                {generatingReport ? "리포트 생성 중…" : "분석 리포트 생성"}
-              </button>
-              {reportUrl ? (
-                <a
-                  href={reportUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-200 hover:bg-emerald-500/20"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  리포트 보기
-                </a>
-              ) : (
-                <span className="text-xs text-slate-500">저장된 리포트 없음</span>
-              )}
+            <div className="grid gap-4 lg:grid-cols-2">
+              {(
+                [
+                  {
+                    kind: "general" as const,
+                    badge: "GENERAL",
+                    title: "일반리포트",
+                    subtitle: "공개·요약용 · 섹션 1~3",
+                    sections: [
+                      "물건 기본 정보 및 물리적 하자 분석 (Overview)",
+                      "심층 권리분석 (Risk Assessment)",
+                      "적정 가치 평가",
+                    ],
+                    model: generalReportModel,
+                    setModel: setGeneralReportModel,
+                    url: generalReportUrl,
+                    accent: "from-sky-500/20 to-indigo-500/10 border-sky-400/25",
+                    badgeCls: "bg-sky-500/20 text-sky-200 ring-sky-400/30",
+                  },
+                  {
+                    kind: "member" as const,
+                    badge: "MEMBER",
+                    title: "회원리포트",
+                    subtitle: "회원 전용 · 풀 리포트(1~7)",
+                    sections: [
+                      "Overview / Risk Assessment / 적정 가치 평가",
+                      "입지·상권 · 수익률 · 명도·출구 · 최종 결론 (4~7)",
+                    ],
+                    model: memberReportModel,
+                    setModel: setMemberReportModel,
+                    url: memberReportUrl,
+                    accent: "from-violet-500/20 to-fuchsia-500/10 border-violet-400/25",
+                    badgeCls: "bg-violet-500/20 text-violet-200 ring-violet-400/30",
+                  },
+                ] as const
+              ).map((card) => {
+                const busy = generatingReportKind === card.kind;
+                const anyBusy = generatingReportKind != null;
+                return (
+                  <div
+                    key={card.kind}
+                    className={`rounded-2xl border bg-gradient-to-br p-4 md:p-5 ${card.accent}`}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold ring-1 ${card.badgeCls}`}
+                        >
+                          {card.badge}
+                        </span>
+                        <h3 className="mt-2 text-base font-bold text-white">{card.title}</h3>
+                        <p className="mt-0.5 text-[12px] text-slate-400">{card.subtitle}</p>
+                      </div>
+                      {card.url ? (
+                        <span className="text-[11px] text-emerald-300">PDF 저장됨</span>
+                      ) : (
+                        <span className="text-[11px] text-slate-500">저장된 리포트 없음</span>
+                      )}
+                    </div>
+                    <ol className="mt-3 list-decimal space-y-1 pl-5 text-[12px] text-slate-300">
+                      {card.sections.map((s) => (
+                        <li key={s}>{s}</li>
+                      ))}
+                    </ol>
+                    <div className="mt-4 max-w-md">
+                      <label className="block text-xs text-slate-400">
+                        텍스트·PDF 분석 모델
+                        <select
+                          className={`${inputClass} mt-1`}
+                          value={card.model}
+                          disabled={anyBusy}
+                          onChange={(e) =>
+                            card.setModel(e.target.value as AuctionReportModelId)
+                          }
+                        >
+                          {AUCTION_REPORT_MODELS.filter((m) => m.textReport).map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.label} — {m.hint}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        PNG 등은{" "}
+                        <span className="text-slate-300">gemini-3-pro-image-preview</span>
+                        (Nano Banana Pro)로 사전 요약합니다.
+                      </p>
+                    </div>
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        disabled={anyBusy}
+                        onClick={() => void handleGenerateReport(card.kind)}
+                        className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#4dabff] to-[#913dff] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+                      >
+                        {busy ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-4 w-4" />
+                        )}
+                        {busy ? "리포트 생성 중…" : `${card.title} 생성`}
+                      </button>
+                      {card.url ? (
+                        <a
+                          href={card.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-200 hover:bg-emerald-500/20"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          {card.title} 보기
+                        </a>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </Section>
         )}
@@ -2184,7 +2269,11 @@ export function AuctionForm({ initial }: AuctionFormProps) {
                   setSchedule(scheduleFromRights(initial.rightsAnalysis ?? ""));
                   setDocSlots(docSlotsFromRights(initial.rightsAnalysis ?? ""));
                   setBidNotes(bidNotesFromRights(initial.rightsAnalysis ?? ""));
-                  setReportUrl(initial.reportUrl?.trim() || null);
+                  setMemberReportUrl(initial.reportUrl?.trim() || null);
+                  setGeneralReportUrl(
+                    (initial as { generalReportUrl?: string | null }).generalReportUrl?.trim() ||
+                      null,
+                  );
                   setAutoKeys(new Set());
                   setFilled(true);
                   setToast("원본으로 되돌렸습니다.");
@@ -2199,7 +2288,8 @@ export function AuctionForm({ initial }: AuctionFormProps) {
                   setListDetails([]);
                   setDocSlots(emptyDocSlots());
                   setBidNotes(emptyBiddingValuationNotes());
-                  setReportUrl(null);
+                  setMemberReportUrl(null);
+                  setGeneralReportUrl(null);
                   setAutoKeys(new Set());
                   setFilled(false);
                   setToast("초기화했습니다.");

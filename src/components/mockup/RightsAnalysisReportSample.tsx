@@ -12,8 +12,8 @@ const SearchIcon = ({ className = "" }: { className?: string }) => (
 
 function SectionBar({ title }: { title: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-full bg-[#ECECEC] px-5 py-2.5">
-      <h2 className="flex-1 text-[15px] font-bold tracking-tight text-[#3D342C]">{title}</h2>
+    <div className="flex items-center gap-3 rounded-full bg-[#F7E8D8] px-5 py-2.5">
+      <h2 className="flex-1 text-left text-[15px] font-bold tracking-tight text-[#3D342C]">{title}</h2>
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#6B5344] text-white shadow-sm">
         <SearchIcon className="h-4 w-4" />
       </span>

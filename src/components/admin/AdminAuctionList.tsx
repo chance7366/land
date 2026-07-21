@@ -198,18 +198,32 @@ export function AdminAuctionList({ items }: { items: Auction[] }) {
                     </td>
                     <td className="p-3 text-center text-sm">{statusLabel(item.status)}</td>
                     <td className="p-3 text-center">
-                      {item.reportUrl ? (
-                        <a
-                          href={item.reportUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-sm text-emerald-400 hover:underline"
-                        >
-                          보기
-                        </a>
-                      ) : (
-                        <span className="text-sm text-landing-muted">—</span>
-                      )}
+                      <div className="flex flex-wrap items-center justify-center gap-1.5">
+                        {(item as { generalReportUrl?: string | null }).generalReportUrl ? (
+                          <a
+                            href={(item as { generalReportUrl?: string | null }).generalReportUrl!}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-md bg-sky-500/15 px-2 py-0.5 text-[11px] font-semibold text-sky-300 ring-1 ring-sky-400/25 hover:bg-sky-500/25"
+                          >
+                            일반
+                          </a>
+                        ) : null}
+                        {item.reportUrl ? (
+                          <a
+                            href={item.reportUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-md bg-violet-500/15 px-2 py-0.5 text-[11px] font-semibold text-violet-300 ring-1 ring-violet-400/25 hover:bg-violet-500/25"
+                          >
+                            회원
+                          </a>
+                        ) : null}
+                        {!item.reportUrl &&
+                        !(item as { generalReportUrl?: string | null }).generalReportUrl ? (
+                          <span className="text-sm text-landing-muted">—</span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="p-3 text-center">
                       <div className="flex items-center justify-center gap-2">

@@ -1,8 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import {
-  AUCTION_ANALYSIS_SYSTEM_PROMPT,
   buildAttachmentCatalogPrompt,
   buildAuctionAnalysisUserPrompt,
+  getAuctionAnalysisSystemPrompt,
   type AuctionReportSource,
 } from "@/lib/auction-analysis-prompt";
 import {
@@ -11,6 +11,7 @@ import {
   GEMINI_PRO_MODEL,
   isTextReportModel,
   NANO_BANANA_PRO_MODEL,
+  type AuctionReportKind,
   type AuctionReportModelId,
 } from "@/lib/auction-report-models";
 import type { ReportMediaPart } from "@/lib/auction-report-media";
@@ -162,9 +163,17 @@ function mediaToParts(media: ReportMediaPart[]): InlinePart[] {
     parts.push({
       text: `\n[첨부:${m.label}] 파일명: ${m.name} (${m.kind})\n`,
     });
-    parts.push({
-      inlineData: { mimeType: m.mimeType, data: m.base64 },
-    });
+    if (m.kind === "text") {
+      parts.push({
+        text: m.textContent?.trim()
+          ? m.textContent
+          : Buffer.from(m.base64, "base64").toString("utf8"),
+      });
+    } else {
+      parts.push({
+        inlineData: { mimeType: m.mimeType, data: m.base64 },
+      });
+    }
   }
   return parts;
 }
@@ -184,9 +193,11 @@ async function summarizeImagesWithImageModel(
           parts: [
             {
               text:
-                "당신은 경매 서류 이미지를 읽는 보조자입니다. 첨부 이미지(등기부·명세서·조사서 스캔 등)에서 " +
-                "말소기준권리, 소유자·채무자, 채권·근저당, 임차·점유, 주의 문구를 한국어로 요약하세요. " +
-                "읽을 수 없으면 이유를 적으세요. 마크다운 불릿으로만 답하세요.",
+                "당신은 경매·시세 서류 이미지를 읽는 보조자입니다. 첨부 이미지에서 다음을 한국어로 요약하세요.\n" +
+                "1) 권리서류(등기부·명세서·조사서 등): 말소기준권리, 소유자·채무자, 채권·근저당, 임차·점유, 주의 문구\n" +
+                "2) 시세·실거래 화면(Npay/KB/아실/국토부 등): 단지명, 면적, 동·층, 호가, 시세(하/일/상), " +
+                "실거래 일자·금액, 공시가격 등 숫자와 단위를 빠짐없이\n" +
+                "파일명·슬롯명을 인용하세요. 읽을 수 없으면 이유를 적으세요. 마크다운 불릿으로만 답하세요.",
             },
             ...mediaToParts(images),
           ],
@@ -219,6 +230,7 @@ export async function generateAuctionAnalysisMarkdown(
   model: AuctionReportModelId = GEMINI_FLASH_MODEL,
   media: ReportMediaPart[] = [],
   skipped: string[] = [],
+  kind: AuctionReportKind = "member",
 ): Promise<GeminiAnalysisResult> {
   const apiKey = getGeminiApiKey();
   if (!apiKey) {
@@ -236,6 +248,7 @@ export async function generateAuctionAnalysisMarkdown(
   const ai = new GoogleGenAI({ apiKey });
   const images = media.filter((m) => m.kind === "image");
   const pdfs = media.filter((m) => m.kind === "pdf");
+  const texts = media.filter((m) => m.kind === "text");
 
   let imageNotes: string | null = null;
   let imageUsage: GeminiUsageRecord | null = null;
@@ -264,10 +277,11 @@ export async function generateAuctionAnalysisMarkdown(
     skipped,
     imageNotes,
   );
-  const userPrompt = `${buildAuctionAnalysisUserPrompt(auction)}\n${catalog}`;
+  const userPrompt = `${buildAuctionAnalysisUserPrompt(auction, kind)}\n${catalog}`;
+  const systemInstruction = getAuctionAnalysisSystemPrompt(kind);
 
-  // PDF는 항상 선택 텍스트 모델에 첨부. 이미지 사전 요약이 실패했을 때만 이미지도 함께 첨부.
-  const mediaForTextModel = imageModelUsed ? pdfs : media;
+  // PDF·TXT는 항상 선택 텍스트 모델에 첨부. 이미지 사전 요약 성공 시 이미지는 요약문만 사용.
+  const mediaForTextModel = imageModelUsed ? [...pdfs, ...texts] : media;
 
   const attempts =
     model === GEMINI_FLASH_MODEL || model === GEMINI_FLASH_25_MODEL ? 2 : 1;
@@ -284,7 +298,7 @@ export async function generateAuctionAnalysisMarkdown(
           },
         ],
         config: {
-          systemInstruction: AUCTION_ANALYSIS_SYSTEM_PROMPT,
+          systemInstruction,
         },
       });
 

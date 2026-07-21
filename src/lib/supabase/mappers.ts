@@ -95,6 +95,7 @@ export function mapAuctionRow(row: Record<string, unknown>) {
     dDay: Number(row.d_day ?? 0),
     images: JSON.stringify(row.images ?? []),
     reportUrl: (row.report_url as string | null) ?? null,
+    generalReportUrl: (row.general_report_url as string | null) ?? null,
     court: sn(row.court),
     saleDate: row.sale_date ? new Date(String(row.sale_date)) : null,
     address: sn(row.address),

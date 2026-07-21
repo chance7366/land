@@ -15,7 +15,10 @@ import {
   GeminiRequestError,
 } from "@/lib/gemini-client";
 import {
+  reportKindLabel,
+  resolveAuctionReportKind,
   resolveAuctionReportModel,
+  type AuctionReportKind,
   type AuctionReportModelId,
 } from "@/lib/auction-report-models";
 import { appendGeminiUsage, type GeminiUsageRecord } from "@/lib/gemini-usage";
@@ -70,19 +73,23 @@ async function loadAuction(id: string) {
   return prisma.auction.findUnique({ where: { id } });
 }
 
-async function uploadReportPdf(auctionId: string, buffer: Buffer): Promise<string> {
+async function uploadReportPdf(
+  auctionId: string,
+  buffer: Buffer,
+  kind: AuctionReportKind,
+): Promise<string> {
   const withCacheBust = (url: string) => {
     const sep = url.includes("?") ? "&" : "?";
     return `${url}${sep}t=${Date.now()}`;
   };
+  const fileStem = kind === "general" ? `${auctionId}-general` : auctionId;
 
   if (isSupabaseEnabled()) {
     try {
-      const storagePath = `auctions/reports/${auctionId}.pdf`;
+      const storagePath = `auctions/reports/${fileStem}.pdf`;
       const publicUrl = await uploadPropertyImage(storagePath, buffer, "application/pdf");
       return withCacheBust(publicUrl);
     } catch (e) {
-      // property-images 버킷에 application/pdf 가 허용되지 않은 경우 로컬로 폴백
       console.warn(
         "[auctions/report] Supabase Storage PDF 업로드 실패 → 로컬 저장으로 폴백. " +
           "Dashboard에서 property-images 버킷 Allowed MIME에 application/pdf를 추가하세요.",
@@ -93,14 +100,20 @@ async function uploadReportPdf(auctionId: string, buffer: Buffer): Promise<strin
 
   const dir = path.join(getUploadDir("auctions"));
   await mkdir(dir, { recursive: true });
-  const filename = `report-${auctionId}.pdf`;
+  const filename = `report-${fileStem}.pdf`;
   await writeFile(path.join(dir, filename), buffer);
   return withCacheBust(`${uploadUrlPrefix("auctions")}/${filename}`);
 }
 
-async function patchReportUrl(id: string, reportUrl: string) {
+async function patchReportUrl(id: string, reportUrl: string, kind: AuctionReportKind) {
   if (isSupabaseEnabled()) {
-    return patchAuctionReportUrlSupabase(id, reportUrl);
+    return patchAuctionReportUrlSupabase(id, reportUrl, kind);
+  }
+  if (kind === "general") {
+    return prisma.auction.update({
+      where: { id },
+      data: { generalReportUrl: reportUrl },
+    });
   }
   return prisma.auction.update({
     where: { id },
@@ -119,9 +132,15 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   let model: AuctionReportModelId;
+  let kind: AuctionReportKind;
   try {
-    const body = (await request.json().catch(() => ({}))) as { model?: unknown };
+    const body = (await request.json().catch(() => ({}))) as {
+      model?: unknown;
+      kind?: unknown;
+      type?: unknown;
+    };
     model = resolveAuctionReportModel(body.model);
+    kind = resolveAuctionReportKind(body.kind ?? body.type);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "모델 선택이 올바르지 않습니다.";
     return NextResponse.json({ error: msg }, { status: 400 });
@@ -165,6 +184,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       model,
       mediaParts,
       mediaSkipped,
+      kind,
     );
     markdown = result.markdown;
     usage = result.usage;
@@ -177,15 +197,18 @@ export async function POST(request: NextRequest, { params }: Params) {
   } catch (e) {
     console.error("[auctions/report] gemini", e);
     if (e instanceof GeminiRequestError) {
-      return NextResponse.json({ error: e.message, model }, { status: e.status });
+      return NextResponse.json({ error: e.message, model, kind }, { status: e.status });
     }
     const msg = e instanceof Error ? e.message : "Gemini 분석 생성에 실패했습니다.";
-    return NextResponse.json({ error: msg, model }, { status: 500 });
+    return NextResponse.json({ error: msg, model, kind }, { status: 500 });
   }
 
   let pdfBuffer: Buffer;
   try {
-    const title = `${source.caseNumber} 권리분석 프리미엄 리포트`;
+    const title =
+      kind === "general"
+        ? `${source.caseNumber} 권리분석 일반 리포트`
+        : `${source.caseNumber} 권리분석 프리미엄 리포트`;
     pdfBuffer = await markdownToPdfBuffer(markdown, title);
   } catch (e) {
     console.error("[auctions/report] pdf", e);
@@ -198,24 +221,33 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   let reportUrl: string;
   try {
-    reportUrl = await uploadReportPdf(id, pdfBuffer);
+    reportUrl = await uploadReportPdf(id, pdfBuffer, kind);
   } catch (e) {
     console.error("[auctions/report] upload", e);
     return NextResponse.json({ error: "PDF 업로드에 실패했습니다." }, { status: 500 });
   }
 
   try {
-    await patchReportUrl(id, reportUrl);
+    await patchReportUrl(id, reportUrl, kind);
   } catch (e) {
     console.error("[auctions/report] patch", e);
     return NextResponse.json(
-      { error: "리포트 URL 저장에 실패했습니다.", reportUrl },
+      {
+        error:
+          "리포트 URL 저장에 실패했습니다. Supabase에 general_report_url 컬럼(마이그레이션 007)이 적용됐는지 확인하세요.",
+        reportUrl,
+        kind,
+      },
       { status: 500 },
     );
   }
 
   return NextResponse.json({
+    kind,
+    kindLabel: reportKindLabel(kind),
     reportUrl,
+    generalReportUrl: kind === "general" ? reportUrl : undefined,
+    memberReportUrl: kind === "member" ? reportUrl : undefined,
     markdown,
     model,
     mediaCount,

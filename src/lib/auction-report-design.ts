@@ -1,6 +1,6 @@
 /**
  * 권리분석 리포트 디자인 토큰·PDF CSS.
- * 목업(`/mockup/rights-analysis-report-sample`)과 동기화.
+ * 목업(`/mockup/report-layout-polish`)과 동기화.
  * Gemini 시스템 지침의 색상·서식과 동일한 값을 사용합니다.
  */
 
@@ -8,7 +8,9 @@ export const REPORT_DESIGN = {
   brown: "#6B5344",
   brownDark: "#3D342C",
   brownMuted: "#A08B78",
-  sectionBar: "#ECECEC",
+  /** 섹션(H2) 바 — 옅은 주황 */
+  sectionBar: "#F7E8D8",
+  /** 표 헤더 — 옅은 베이지 */
   tableHead: "#F3F1EE",
   tableStripe: "#FAF8F6",
   border: "#E6E0D8",
@@ -40,33 +42,57 @@ export const REPORT_PDF_CSS = `
   @page { margin: 16mm 14mm; }
   * { box-sizing: border-box; }
   body {
+    position: relative;
     font-family: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
     font-size: 10.5pt;
     line-height: 1.65;
     color: ${REPORT_DESIGN.body};
     background: #fff;
   }
+  .generated-at {
+    position: absolute;
+    top: 0;
+    right: 0;
+    margin: 0;
+    font-size: 8.5pt;
+    color: #8A7A6A;
+    text-align: right;
+  }
+  .report-cover {
+    text-align: center;
+    padding-top: 14px;
+    margin-bottom: 20px;
+  }
+  .eyebrow {
+    margin: 0 0 6px;
+    font-size: 8.5pt;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    color: ${REPORT_DESIGN.brownMuted};
+  }
+  .eyebrow::after {
+    content: "";
+    display: block;
+    width: 64px;
+    height: 1px;
+    background: #C4B5A5;
+    margin: 8px auto 0;
+  }
   h1 {
     font-size: 20pt;
     font-weight: 800;
     text-align: center;
     color: ${REPORT_DESIGN.brown};
-    margin: 0 0 6px;
+    margin: 10px 0 8px;
     letter-spacing: -0.02em;
   }
-  .meta {
+  .ai-notice {
+    margin: 0 auto;
+    max-width: 34em;
     text-align: center;
-    color: ${REPORT_DESIGN.brownMuted};
+    color: #8A7A6A;
     font-size: 9pt;
-    margin: 0 0 18px;
-  }
-  .meta::after {
-    content: "";
-    display: block;
-    width: 72px;
-    height: 1px;
-    background: #C4B5A5;
-    margin: 12px auto 0;
+    line-height: 1.55;
   }
   h2 {
     font-size: 12.5pt;
@@ -77,6 +103,7 @@ export const REPORT_PDF_CSS = `
     padding: 10px 18px;
     margin: 22px 0 12px;
     border: none;
+    text-align: left;
     page-break-after: avoid;
   }
   h3 {
@@ -84,7 +111,7 @@ export const REPORT_PDF_CSS = `
     font-weight: 700;
     color: ${REPORT_DESIGN.indigo};
     margin: 16px 0 8px;
-    padding-bottom: 4px;
+    padding: 0 0 4px 0.5em;
     border-bottom: 1px solid ${REPORT_DESIGN.teal}B3;
     page-break-after: avoid;
   }
@@ -101,6 +128,7 @@ export const REPORT_PDF_CSS = `
   }
   table {
     border-collapse: collapse;
+    table-layout: fixed;
     width: 100%;
     margin: 12px 0 16px;
     font-size: 9.5pt;
@@ -111,16 +139,34 @@ export const REPORT_PDF_CSS = `
   th, td {
     border: 1px solid ${REPORT_DESIGN.border};
     padding: 8px 10px;
+    word-break: keep-all;
   }
   th {
     background: ${REPORT_DESIGN.tableHead};
     color: ${REPORT_DESIGN.brownDark};
     font-weight: 700;
-    text-align: left;
+    text-align: center;
   }
-  td { text-align: center; }
-  td:first-child { text-align: left; }
+  td {
+    text-align: center;
+    vertical-align: middle;
+  }
   tr:nth-child(even) td { background: ${REPORT_DESIGN.tableStripe}; }
+  tr.address-row td {
+    text-align: left;
+    background: ${REPORT_DESIGN.tableStripe};
+  }
+  /* 긴 서술 열 — 좌측 정렬 */
+  table.table-kb-band td:nth-child(4),
+  table.table-valuation td:nth-child(3) {
+    text-align: left;
+    white-space: normal;
+    line-height: 1.45;
+  }
+  table.table-kb-band td:nth-child(-n+3),
+  table.table-valuation td:nth-child(-n+2) {
+    white-space: nowrap;
+  }
   blockquote {
     margin: 12px 0;
     padding: 12px 14px;
@@ -170,13 +216,65 @@ export const REPORT_PDF_CSS = `
   }
 `;
 
-/** marked HTML에 배지·요약박스 클래스를 입힙니다. */
+function stripTags(s: string): string {
+  return s.replace(/<[^>]+>/g, "").trim();
+}
+
+/** 표 헤더를 보고 열폭·좌측정렬 클래스를 붙입니다. */
+function enhanceTables(html: string): string {
+  return html.replace(/<table([^>]*)>([\s\S]*?)<\/table>/gi, (full, attrs: string, inner: string) => {
+    const firstRow = inner.match(/<tr[^>]*>([\s\S]*?)<\/tr>/i)?.[1] ?? "";
+    const headers = [...firstRow.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/gi)].map((m) =>
+      stripTags(m[1]),
+    );
+    if (headers.length === 0) return full;
+
+    const isKbBand =
+      headers.some((h) => h.includes("하위 평균가")) &&
+      headers.some((h) => h.includes("시세 괴리율"));
+    const isValuation =
+      headers.some((h) => h.includes("평가 금액") || h === "평가금액") &&
+      headers.some((h) => h.includes("가치 산정") || h.includes("핵심 논거"));
+
+    let className = "";
+    let colgroup = "";
+    if (isKbBand) {
+      className = "table-kb-band";
+      colgroup =
+        '<colgroup><col style="width:18%" /><col style="width:18%" /><col style="width:18%" /><col style="width:46%" /></colgroup>';
+    } else if (isValuation) {
+      className = "table-valuation";
+      colgroup =
+        '<colgroup><col style="width:12%" /><col style="width:18%" /><col style="width:70%" /></colgroup>';
+    }
+
+    if (!className) return full;
+
+    let nextAttrs = attrs;
+    if (/\bclass\s*=/.test(attrs)) {
+      nextAttrs = attrs.replace(/\bclass\s*=\s*(["'])([^"']*)\1/i, (_, q, c) => {
+        return `class=${q}${c} ${className}${q}`;
+      });
+    } else {
+      nextAttrs = `${attrs} class="${className}"`;
+    }
+
+    let nextInner = inner;
+    if (!/<colgroup/i.test(inner)) {
+      nextInner = colgroup + inner;
+    }
+    return `<table${nextAttrs}>${nextInner}</table>`;
+  });
+}
+
+/** marked HTML에 배지·요약박스·표 클래스를 입힙니다. */
 export function enhanceReportHtml(html: string): string {
-  // PDF 표지 h1과 중복되는 본문 선두 h1 제거
   let out = html.replace(
     /^\s*<h1[^>]*>[\s\S]*?권리분석[\s\S]*?<\/h1>\s*/i,
     "",
   );
+  out = out.replace(/<h3([^>]*)>\s*[-–—]\s*/g, "<h3$1>");
+
   const badges: [RegExp, string][] = [
     [/\[위험\]/g, '<span class="badge badge-danger">[위험]</span>'],
     [/\[주의\]/g, '<span class="badge badge-warn">[주의]</span>'],
@@ -185,7 +283,21 @@ export function enhanceReportHtml(html: string): string {
   ];
   for (const [re, rep] of badges) out = out.replace(re, rep);
 
-  // Gemini가 쓰는 요약 인용구 휴리스틱: "인수 요약" 등이 포함된 blockquote
+  // 경매 개요 소재지 행: 첫 칸 "소재지 : …" + 빈 칸 → 4열 병합
+  out = out.replace(/<tr>([\s\S]*?)<\/tr>/g, (full, inner: string) => {
+    const cells = [...inner.matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/gi)];
+    if (cells.length < 2) return full;
+    const firstText = stripTags(cells[0][1]);
+    if (!/^소재지\s*:/.test(firstText)) return full;
+    const restEmpty = cells
+      .slice(1)
+      .every((c) => stripTags(c[1]) === "");
+    if (!restEmpty) return full;
+    return `<tr class="address-row"><td colspan="${cells.length}">${cells[0][1]}</td></tr>`;
+  });
+
+  out = enhanceTables(out);
+
   out = out.replace(
     /<blockquote>([\s\S]*?)<\/blockquote>/g,
     (full, inner: string) => {

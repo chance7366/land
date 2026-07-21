@@ -49,17 +49,60 @@ export const AUCTION_DOC_SLOTS: {
 export const BIDDING_VALUATION_SLOTS: {
   type: BiddingValuationDocType;
   label: string;
+  placeholder: string;
 }[] = [
-  { type: "bidNpay", label: "Npay부동산" },
-  { type: "bidActualTrade", label: "KB부동산" },
-  { type: "bidNaverPrice", label: "아실정보지" },
-  { type: "bidKbPrice", label: "호갱노노" },
-  { type: "bidWinningCase", label: "낙찰사례" },
-  { type: "bidCostData", label: "비용데이터" },
-  { type: "bidOther1", label: "기타1" },
-  { type: "bidOther2", label: "기타2" },
-  { type: "bidOther3", label: "기타3" },
-  { type: "bidOther4", label: "기타4" },
+  {
+    type: "bidNpay",
+    label: "Npay부동산",
+    placeholder:
+      "Npay_공시가격, Npay_단지정보, Npay_매물, Npay_실거래가를 첨부하거나 직접 입력, 붙여넣으세요",
+  },
+  {
+    type: "bidActualTrade",
+    label: "KB부동산",
+    placeholder: "KB_실거래가, KB_시세를 첨부하거나 직접 입력, 붙여넣으세요",
+  },
+  {
+    type: "bidNaverPrice",
+    label: "아실정보지",
+    placeholder: "아실_실거래가를 첨부하거나 직접 입력, 붙여넣으세요",
+  },
+  {
+    type: "bidKbPrice",
+    label: "국토부실거래가",
+    placeholder:
+      "경매정보지의 국토부실거래가_매매, 국토부실거래가_전월세를 첨부하거나 직접 입력, 붙여넣으세요",
+  },
+  {
+    type: "bidWinningCase",
+    label: "낙찰사례",
+    placeholder: "낙찰사례를 첨부하거나 직접 입력, 붙여넣으세요",
+  },
+  {
+    type: "bidCostData",
+    label: "비용데이터",
+    placeholder: "비용데이터를 첨부하거나 직접 입력, 붙여넣으세요",
+  },
+  {
+    type: "bidOther1",
+    label: "기타1",
+    placeholder: "기타 자료를 첨부하거나 직접 입력, 붙여넣으세요",
+  },
+  {
+    type: "bidOther2",
+    label: "기타2",
+    placeholder: "기타 자료를 첨부하거나 직접 입력, 붙여넣으세요",
+  },
+  {
+    type: "bidOther3",
+    label: "기타3",
+    placeholder: "기타 자료를 첨부하거나 직접 입력, 붙여넣으세요",
+  },
+  {
+    type: "bidOther4",
+    label: "기타4",
+    placeholder: "기타 자료를 첨부하거나 직접 입력, 붙여넣으세요",
+  },
 ];
 
 const COURT_DOC_TYPES = new Set<string>(AUCTION_DOC_SLOTS.map((s) => s.type));
@@ -76,6 +119,19 @@ export function isBiddingValuationDocType(type: string): type is BiddingValuatio
 /** 법원 서류 슬롯만 (리포트 Gemini 첨부용) */
 export function courtDocAttachments(list: AuctionAttachment[]): AuctionAttachment[] {
   return list.filter((a) => isAuctionDocType(a.type));
+}
+
+/** 적정가치평가(구 입찰가산정) 슬롯 첨부 */
+export function biddingValuationAttachments(list: AuctionAttachment[]): AuctionAttachment[] {
+  return list.filter((a) => isBiddingValuationDocType(a.type));
+}
+
+export function labelForAttachmentType(type: string): string {
+  return (
+    AUCTION_DOC_SLOTS.find((s) => s.type === type)?.label ??
+    BIDDING_VALUATION_SLOTS.find((s) => s.type === type)?.label ??
+    type
+  );
 }
 
 /** 슬롯당 최대 첨부 수 · 전체 상한 */

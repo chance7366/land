@@ -1,5 +1,34 @@
 /** 경매분석 리포트용 Gemini 모델 ID (클라이언트·서버 공용, SDK 미포함) */
 
+/** 일반 = 섹션 1~3 / 회원 = 현행 풀 리포트(1~7). report_url = 회원, general_report_url = 일반 */
+export type AuctionReportKind = "general" | "member";
+
+export function resolveAuctionReportKind(raw: unknown): AuctionReportKind {
+  if (
+    raw === "general" ||
+    raw === "일반" ||
+    raw === "일반리포트" ||
+    raw === "basic"
+  ) {
+    return "general";
+  }
+  if (
+    raw === "member" ||
+    raw === "회원" ||
+    raw === "회원리포트" ||
+    raw === "premium" ||
+    raw === "full"
+  ) {
+    return "member";
+  }
+  // 미지정 시 기존 동작 = 회원(풀) 리포트
+  return "member";
+}
+
+export function reportKindLabel(kind: AuctionReportKind): string {
+  return kind === "general" ? "일반리포트" : "회원리포트";
+}
+
 /** 기본(빠른) 분석 — Gemini 3.5 Flash */
 export const GEMINI_FLASH_MODEL = "gemini-3.5-flash";
 /** 안정·대체 Flash */

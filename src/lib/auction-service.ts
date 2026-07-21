@@ -45,7 +45,10 @@ export type AuctionInput = {
   safetyGrade?: AuctionSafetyGrade;
   status?: AuctionStatus;
   featured?: boolean;
+  /** 회원리포트(풀) PDF */
   reportUrl?: string | null;
+  /** 일반리포트(1~3) PDF */
+  generalReportUrl?: string | null;
 };
 
 function strOrNull(v: unknown): string | null {
@@ -125,6 +128,7 @@ export function toAuctionCreateData(input: AuctionInput & { manageCode: string }
     images: JSON.stringify((input.images ?? []).slice(0, 8)),
     attachments: stringifyAuctionAttachments(input.attachments ?? []),
     reportUrl: input.reportUrl ?? null,
+    generalReportUrl: input.generalReportUrl ?? null,
     court: input.court ?? null,
     saleDate,
     address: input.address ?? null,
@@ -211,6 +215,7 @@ export function parseAuctionBody(
       status: (body.status as AuctionStatus) ?? "ONGOING",
       featured: Boolean(body.featured),
       reportUrl: strOrNull(body.reportUrl),
+      generalReportUrl: strOrNull(body.generalReportUrl),
     },
   };
 }
