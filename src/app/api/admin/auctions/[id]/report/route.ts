@@ -27,7 +27,10 @@ import {
   loadReportMediaParts,
 } from "@/lib/auction-report-media";
 import { markdownToPdfBuffer } from "@/lib/auction-report-pdf";
-import type { AuctionReportSource } from "@/lib/auction-analysis-prompt";
+import {
+  stripGeneralReportExtraSections,
+  type AuctionReportSource,
+} from "@/lib/auction-analysis-prompt";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -201,6 +204,10 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
     const msg = e instanceof Error ? e.message : "Gemini 분석 생성에 실패했습니다.";
     return NextResponse.json({ error: msg, model, kind }, { status: 500 });
+  }
+
+  if (kind === "general") {
+    markdown = stripGeneralReportExtraSections(markdown);
   }
 
   let pdfBuffer: Buffer;

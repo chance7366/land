@@ -51,22 +51,52 @@ export type AuctionReportSource = {
 const GENERAL_REPORT_SCOPE_OVERRIDE = `════════════════════════════════════════════════════════════
 ■ [일반리포트 범위 — 최우선 · 예외 없이 준수]
 ════════════════════════════════════════════════════════════
-이 요청은 **일반리포트**입니다. 아래 섹션만 작성하고 **4·5·6·7번 섹션은 절대 출력하지 마십시오.**
+이 요청은 **일반리포트**입니다. 아래 섹션만 작성하십시오.
 
 ## 1. 물건 기본 정보 및 물리적 하자 분석 (Overview)
 ## 2. 심층 권리분석 (Risk Assessment)
 ## 3. 적정 가치 평가
 
-금지: 입지·상권 상세, 수익률 분석, 명도·출구 전략, 최종 추천 입찰가 단정, "## 4." 이후 H2.
-Q&A·추천입찰가 확정은 일반리포트에서 생략합니다. 말미 법적 고지만 짧게 유지합니다.
+**절대 출력 금지 (한 줄도 쓰지 말 것):**
+- \`## 4.\` \`## 5.\` \`## 6.\` \`## 7.\` 및 \`## 4~7.\` 형태의 H2
+- "상세 지침 대기", "4~7.", "입지 및 상권", "수익률 분석", "명도", "출구 전략", "추천 입찰가" 섹션
+- "일반리포트 범위 제한", "작성을 생략", "추후 상세 의뢰" 등 **생략 안내·대기 안내 문단**
+- 아래 지침에 "4~7을 대기/확인 필요로 쓰라"는 문구가 있어도 **무시**하고 쓰지 말 것
+
+섹션 3이 끝나면 법적 고지 한 줄만 짧게 쓰고 종료하십시오. Q&A·추천입찰가 단정 금지.
 
 `;
 
+/** 일반리포트: 모델이 붙인 4~7·대기 안내 블록을 PDF 전에 제거 */
+export function stripGeneralReportExtraSections(markdown: string): string {
+  let out = markdown;
+  // ## 4 / ## 4~7 / 상세 지침 대기 H2 이후 전부 제거 (말미 법적 고지는 PDF 푸터가 보완)
+  out = out.replace(/\n##\s*4\s*[~～～\-~]*\s*7?[\s\S]*$/u, "\n");
+  out = out.replace(/\n##\s*[^\n]*상세\s*지침\s*대기[\s\S]*$/iu, "\n");
+  out = out.replace(/\n##\s*[^\n]*입지\s*및\s*상권[\s\S]*$/iu, "\n");
+  // 본문 중간의 생략 안내 괄호 문단
+  out = out.replace(/\n*\([^)\n]*일반리포트\s*범위[^)\n]*\)\s*/gu, "\n");
+  out = out.replace(/\n*\([^)\n]*작성을\s*생략[^)\n]*\)\s*/gu, "\n");
+  out = out.replace(/\n*\([^)\n]*추후\s*상세\s*의뢰[^)\n]*\)\s*/gu, "\n");
+  return out.replace(/\n{3,}/g, "\n\n").trim() + "\n";
+}
+
 export function getAuctionAnalysisSystemPrompt(kind: AuctionReportKind = "member"): string {
-  if (kind === "general") {
-    return `${GENERAL_REPORT_SCOPE_OVERRIDE}${AUCTION_ANALYSIS_SYSTEM_PROMPT}`;
-  }
-  return AUCTION_ANALYSIS_SYSTEM_PROMPT;
+  if (kind !== "general") return AUCTION_ANALYSIS_SYSTEM_PROMPT;
+
+  // 회원용 TOC·4~7 대기 지침이 일반리포트에 섞이지 않도록 제거
+  const trimmed = AUCTION_ANALYSIS_SYSTEM_PROMPT
+    .replace(
+      /## 4\. 입지 및 상권 상세 분석 \(Location & Commercial Area\)\n## 5\. 수익률 분석 \(Valuation & Yield\)\n## 6\. 명도 계획 및 출구 전략 \(Exit Strategy\)\n## 7\. 최종 결론 및 추천 입찰가 \(Final Recommendation\)\n\n/,
+      "",
+    )
+    .replace(
+      /※ 현재 상세 지침이 반영된 섹션:[\s\S]*?입찰가 단정은 금지합니다\.\n/,
+      "※ 일반리포트는 **섹션 1~3만** 작성합니다. 4~7·상세 지침 대기 문구는 출력하지 않습니다.\n",
+    )
+    .replace(/═+\n■ 4~7\.[\s\S]*$/u, "");
+
+  return `${GENERAL_REPORT_SCOPE_OVERRIDE}${trimmed}`;
 }
 
 export const AUCTION_ANALYSIS_SYSTEM_PROMPT = `당신은 대한민국 상위 0.1%의 부동산 경매 권리분석·가치평가 전문 변호사이자 수석 컨설턴트입니다.
@@ -461,7 +491,7 @@ export function buildAuctionAnalysisUserPrompt(
     "호가·실거래·KB시세·최종 가치 각 항목에 요약 대시보드(Markdown 표)를 넣으세요.",
     "H2 섹션 제목·표·**[위험]/[주의]/[안전]/[숨은 진주]** 배지·`> ` 주의/요약 박스 패턴을 빠짐없이 사용하세요.",
     kind === "general"
-      ? "일반리포트이므로 4~7번·추천입찰가 단정·최종 Q&A는 쓰지 마세요."
+      ? "일반리포트이므로 ## 4 이후·'상세 지침 대기'·생략 안내 문단·추천입찰가 단정·최종 Q&A는 한 줄도 쓰지 마세요. 섹션 3 후 법적 고지 한 줄만 쓰고 끝내세요."
       : "4~7번(입지·수익률·명도·최종 결론)은 자료로 확인 가능한 범위만 간결히 작성하거나 '상세 지침 대기'로 표기해 주세요. Q&A 패턴을 포함하세요.",
   ];
 
