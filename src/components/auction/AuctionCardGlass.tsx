@@ -16,7 +16,7 @@ export function AuctionCardGlass({ auction }: { auction: Auction }) {
 
   return (
     <Link
-      href={`/auctions?id=${encodeURIComponent(auction.id)}`}
+      href={`/auctions/${encodeURIComponent(auction.id)}`}
       className="group flex w-full max-w-[280px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#1f1f1f]/95 shadow-[0_8px_32px_rgba(0,0,0,0.45),0_0_0_1px_rgba(212,175,55,0.1)] backdrop-blur-sm transition-[transform,box-shadow,border-color,background-color] duration-300 hover:-translate-y-0.5 hover:border-[#d4af37]/45 hover:bg-[#262626] hover:shadow-[0_12px_40px_rgba(0,0,0,0.5),0_0_28px_rgba(212,175,55,0.28)] sm:max-w-none"
     >
       <div className="relative aspect-[16/10] bg-[#141414]">

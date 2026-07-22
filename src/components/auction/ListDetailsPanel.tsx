@@ -25,10 +25,10 @@ export function ListDetailsPanel({ rows, showSourceHint = false }: Props) {
         )}
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="max-h-[280px] overflow-auto">
         <table className="w-full min-w-[520px] border-collapse text-left text-xs text-[#cbd5e1]">
-          <thead>
-            <tr className="border-b border-white/10 bg-white/[0.06]">
+          <thead className="sticky top-0 z-10">
+            <tr className="border-b border-white/10 bg-[#14121c]">
               <th className="w-20 px-3 py-2.5 text-center text-[11px] font-medium text-slate-400">
                 목록번호
               </th>

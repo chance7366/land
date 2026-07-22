@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isSupabaseEnabled } from "@/lib/supabase/config";
+import { listSubscribersSupabase } from "@/lib/supabase/repos/subscribers";
 import {
   parseChannels,
   parsePreferences,
@@ -11,13 +13,37 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
-    const where =
-      status && ["PENDING", "APPROVED", "REJECTED"].includes(status)
-        ? { status }
-        : {};
+    const statusFilter =
+      status && ["PENDING", "APPROVED", "REJECTED"].includes(status) ? status : undefined;
+
+    if (isSupabaseEnabled()) {
+      const rows = await listSubscribersSupabase(
+        statusFilter ? { status: statusFilter } : undefined,
+      );
+      return NextResponse.json(
+        rows.map((row) => {
+          const type = row.subscription_type as SubscriptionType;
+          const preferences = parsePreferences(type, row.preferences);
+          return {
+            id: row.id,
+            name: row.name,
+            email: row.email,
+            phone: row.phone,
+            subscriptionType: type,
+            channels: parseChannels(row.channels),
+            preferences,
+            summary: summarizePreferences(type, preferences),
+            status: row.status,
+            adminNote: row.admin_note,
+            notificationCount: 0,
+            createdAt: row.created_at,
+          };
+        }),
+      );
+    }
 
     const items = await prisma.emailSubscriber.findMany({
-      where,
+      where: statusFilter ? { status: statusFilter } : {},
       orderBy: { createdAt: "desc" },
       include: {
         _count: { select: { notifications: true } },

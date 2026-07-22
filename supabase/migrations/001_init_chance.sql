@@ -148,7 +148,7 @@ create table if not exists public.subscribers (
   name                text,
   email               text,
   phone               text,
-  subscription_type   text not null, -- REAL_ESTATE | AUCTION
+  subscription_type   text not null, -- REAL_ESTATE | AUCTION | NEWS
   channels            jsonb not null default '["EMAIL"]'::jsonb,
   preferences         jsonb not null default '{}'::jsonb,
   status              text not null default 'PENDING', -- PENDING | APPROVED | REJECTED

@@ -2,7 +2,7 @@
 
 /**
  * 사용자 경매 Split 상세 우측 패널 — 관리자 1~6절 구조 목업.
- * 운영 AuctionSplitDetail 에는 미적용.
+ * 운영 AuctionSplitDetail 에 동일 구조 반영됨.
  */
 
 import { useState } from "react";
@@ -107,7 +107,7 @@ export function AuctionUserDetailAdminSectionsSample() {
     <div className="min-h-screen bg-[#0B0F19] font-[family-name:var(--font-unifine),Outfit,sans-serif] text-slate-200">
       <div className="border-b border-amber-400/30 bg-[#12100a] px-4 py-3 text-center text-xs text-amber-100/90">
         <p className="font-bold text-amber-50">
-          사용자 경매상세 우측 패널 · 관리자 1~6절 구조 목업 (미적용)
+          사용자 경매상세 우측 패널 · 관리자 1~6절 구조 목업 (운영 반영됨)
         </p>
         <p className="mt-1 text-[11px] text-amber-100/70">
           1 기본정보 · 2 기일 내역 · 3 목록 내역 · 4 감정요약 · 5 물건상세 · 6 현황조사서
@@ -217,10 +217,8 @@ export function AuctionUserDetailAdminSectionsSample() {
               <Section n={6} title="현황조사서" hint="관리자 수정 §6 · 법원 현황조사서 서식">
                 <StatusReportSection
                   bare
+                  readOnly
                   report={statusReport}
-                  onChange={() => {
-                    /* 목업 읽기 전용 */
-                  }}
                 />
               </Section>
             </div>

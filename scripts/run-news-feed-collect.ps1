@@ -55,6 +55,26 @@ $mode = "sqlite"
 if ($useSupabase) { $mode = "supabase" }
 Write-Log ("START mode={0} cwd={1} DATA_PROVIDER={2} DATABASE_URL={3}" -f $mode, $runDir, $env:DATA_PROVIDER, $env:DATABASE_URL)
 
+# 당일 첫 수집 시작 + 10분 후 부동산소식 메일 (하루 1회)
+$digestFlag = Join-Path $logDir ("news-digest-scheduled-{0:yyyyMMdd}.flag" -f (Get-Date))
+if (-not (Test-Path $digestFlag)) {
+  Set-Content -Path $digestFlag -Value (("scheduledAt={0:yyyy-MM-dd HH:mm:ss}" -f (Get-Date))) -Encoding UTF8
+  $delayScript = Join-Path $PSScriptRoot "run-news-digest-delayed.ps1"
+  Start-Process -FilePath "powershell.exe" `
+    -ArgumentList @(
+      "-NoProfile",
+      "-ExecutionPolicy", "Bypass",
+      "-WindowStyle", "Hidden",
+      "-File", $delayScript
+    ) `
+    -WorkingDirectory $workspace `
+    -WindowStyle Hidden | Out-Null
+  Write-Log "NEWS_DIGEST scheduled (+10 min after first collect start)"
+}
+else {
+  Write-Log "NEWS_DIGEST already scheduled today — skip re-schedule"
+}
+
 Push-Location $runDir
 try {
   $scriptPath = Join-Path $workspace "scripts\collect-news-feed.ts"

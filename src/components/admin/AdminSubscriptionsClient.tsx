@@ -125,7 +125,7 @@ export function AdminSubscriptionsClient({ initialItems }: { initialItems: Row[]
         <div>
           <h1 className="font-headline-lg text-landing-text">맞춤 알림 관리</h1>
           <p className="mt-1 text-sm text-landing-muted">
-            신청 승인·거절. 승인된 구독자에게는 조건에 맞는 매물·경매 등록 시 즉시 알림합니다.
+            신청 승인·거절. 매물·경매는 등록 시 즉시 알림, 부동산소식은 매일 당일 리포트 메일입니다.
           </p>
         </div>
         <Link href="/admin" className="text-sm text-blue-400 hover:underline">
@@ -206,10 +206,16 @@ export function AdminSubscriptionsClient({ initialItems }: { initialItems: Row[]
                           className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${
                             row.subscriptionType === "REAL_ESTATE"
                               ? "border-sky-400/40 bg-sky-500/15 text-sky-300"
-                              : "border-amber-400/40 bg-amber-500/15 text-amber-300"
+                              : row.subscriptionType === "NEWS"
+                                ? "border-fuchsia-400/40 bg-fuchsia-500/15 text-fuchsia-300"
+                                : "border-amber-400/40 bg-amber-500/15 text-amber-300"
                           }`}
                         >
-                          {row.subscriptionType === "REAL_ESTATE" ? "부동산매매" : "경매물건"}
+                          {row.subscriptionType === "REAL_ESTATE"
+                            ? "부동산매매"
+                            : row.subscriptionType === "NEWS"
+                              ? "부동산소식"
+                              : "경매물건"}
                         </span>
                       </td>
                       <td className="p-4 text-xs text-landing-muted">

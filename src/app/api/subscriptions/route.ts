@@ -17,6 +17,14 @@ export async function POST(request: NextRequest) {
     }
 
     const { data } = parsed;
+    const okMessage =
+      data.subscriptionType === "NEWS"
+        ? "신청이 접수되었습니다. 관리자 승인 후, 매일 당일 부동산소식을 메일로 보내 드립니다."
+        : "신청이 접수되었습니다. 관리자 승인 후, 조건에 맞는 물건이 등록되면 바로 알려 드립니다.";
+    const updateMessage =
+      data.subscriptionType === "NEWS"
+        ? "기존 신청을 갱신했습니다. 관리자 승인 후, 매일 당일 부동산소식을 메일로 보내 드립니다."
+        : "기존 신청을 갱신했습니다. 관리자 승인 후, 조건에 맞는 물건이 등록되면 바로 알려 드립니다.";
 
     if (isSupabaseEnabled()) {
       const existing = await findSubscriberSupabase({
@@ -47,8 +55,7 @@ export async function POST(request: NextRequest) {
           {
             id: updated.id,
             status: updated.status,
-            message:
-              "기존 신청을 갱신했습니다. 관리자 승인 후, 조건에 맞는 물건이 등록되면 바로 알려 드립니다.",
+            message: updateMessage,
           },
           { status: 200 },
         );
@@ -60,15 +67,14 @@ export async function POST(request: NextRequest) {
         phone: data.phone,
         subscriptionType: data.subscriptionType,
         channels: data.channels,
-        preferences: data.preferences,
+        preferences: data.preferences as Record<string, unknown>,
         isPrivacyAgreed: true,
       });
       return NextResponse.json(
         {
           id: created.id,
           status: "PENDING",
-          message:
-            "신청이 접수되었습니다. 관리자 승인 후, 조건에 맞는 물건이 등록되면 바로 알려 드립니다.",
+          message: okMessage,
         },
         { status: 201 },
       );
@@ -105,8 +111,7 @@ export async function POST(request: NextRequest) {
         {
           id: updated.id,
           status: updated.status,
-          message:
-            "기존 신청을 갱신했습니다. 관리자 승인 후, 조건에 맞는 물건이 등록되면 바로 알려 드립니다.",
+          message: updateMessage,
         },
         { status: 200 },
       );
@@ -129,8 +134,7 @@ export async function POST(request: NextRequest) {
       {
         id: created.id,
         status: created.status,
-        message:
-          "신청이 접수되었습니다. 관리자 승인 후, 조건에 맞는 물건이 등록되면 바로 알려 드립니다.",
+        message: okMessage,
       },
       { status: 201 },
     );

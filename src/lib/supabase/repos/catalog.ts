@@ -94,6 +94,17 @@ export async function listAuctionsFromSupabase() {
   return (data ?? []).map(mapAuctionRow);
 }
 
+export async function getAuctionFromSupabase(id: string) {
+  const sb = createSupabaseDataClient();
+  const { data, error } = await sb
+    .from("auctions")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? mapAuctionRow(data) : null;
+}
+
 /** 찬스상담소 게시판 목록 — 공개글 + 비밀글(자물쇠). 홈 미리보기는 landing 쪽에서 is_public만 사용 */
 export async function listLegalQuestionsFromSupabase(take = 100) {
   const sb = createSupabaseDataClient();

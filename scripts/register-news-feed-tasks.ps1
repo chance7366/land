@@ -1,5 +1,6 @@
 # 부동산소식 수집 Windows 작업 등록 (매일 08:00 / 14:00 / 20:00 로컬=KST)
 # 콘솔 창이 뜨지 않도록 wscript + Hidden PowerShell로 등록합니다.
+# 당일 첫 수집 시작 시 run-news-feed-collect.ps1 이 +10분 후 소식 메일 발송을 예약합니다.
 $ErrorActionPreference = "Stop"
 
 $script = Join-Path $PSScriptRoot "run-news-feed-collect.ps1"
@@ -36,7 +37,7 @@ Register-ScheduledTask `
   -Trigger $triggers `
   -Settings $settings `
   -Principal $principal `
-  -Description "찬스부동산 부동산소식 수집 (08:00/14:00/20:00 KST, 창 숨김)" `
+  -Description "찬스부동산 부동산소식 수집 (08/14/20 KST). 첫 수집+10분 메일 예약 포함" `
   -Force | Out-Null
 
 Write-Host "Registered scheduled task: $taskName (hidden window)"

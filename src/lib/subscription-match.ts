@@ -63,6 +63,7 @@ export function matchesEntity(
   entity: Property | Auction,
   preferences: SubscriptionPreferences,
 ): boolean {
+  if (subscriptionType === "NEWS") return false;
   if (subscriptionType === "REAL_ESTATE") {
     return matchesProperty(entity as Property, preferences);
   }

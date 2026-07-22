@@ -502,7 +502,7 @@ function AuctionMarqueeCard({
   const ratioPct = appraisalRatioPercent(auction.appraisalPrice, minPrice);
 
   return (
-    <Link href={`/auctions?id=${encodeURIComponent(auction.id)}`} className={styles.cardAuction}>
+    <Link href={`/auctions/${encodeURIComponent(auction.id)}`} className={styles.cardAuction}>
       <div className="relative aspect-[16/10] bg-landing-image">
         {cover ? (
           <Image

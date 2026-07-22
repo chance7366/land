@@ -332,7 +332,7 @@ model EmailSubscriber {
   name             String?
   email            String?
   phone            String?
-  subscriptionType String // REAL_ESTATE | AUCTION
+  subscriptionType String // REAL_ESTATE | AUCTION | NEWS
   channels         String   @default("[\"EMAIL\"]") // JSON: EMAIL | SMS | KAKAO
   preferences      String   @default("{}") // JSON 조건
   status           String   @default("PENDING") // PENDING | APPROVED | REJECTED
@@ -353,7 +353,7 @@ model NotificationLog {
   id           String   @id @default(cuid())
   subscriberId String
   subscriber   EmailSubscriber @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
-  entityType   String // PROPERTY | AUCTION
+  entityType   String // PROPERTY | AUCTION | NEWS_DIGEST
   entityId     String
   channel      String // EMAIL | SMS | KAKAO
   status       String // SENT | FAILED | SKIPPED

@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isSupabaseEnabled } from "@/lib/supabase/config";
+import {
+  deleteSubscriberSupabase,
+  updateSubscriberSupabase,
+} from "@/lib/supabase/repos/subscribers";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
-    const existing = await prisma.emailSubscriber.findUnique({ where: { id } });
-    if (!existing) {
-      return NextResponse.json({ error: "신청을 찾을 수 없습니다." }, { status: 404 });
-    }
-
     const body = await request.json();
     const status = body.status as string | undefined;
     if (status && !["PENDING", "APPROVED", "REJECTED"].includes(status)) {
@@ -19,6 +19,23 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     const adminNote =
       typeof body.adminNote === "string" ? body.adminNote.trim().slice(0, 500) : undefined;
+
+    if (isSupabaseEnabled()) {
+      const updated = await updateSubscriberSupabase(id, {
+        ...(status ? { status } : {}),
+        ...(adminNote !== undefined ? { adminNote: adminNote || null } : {}),
+      });
+      return NextResponse.json({
+        id: updated.id,
+        status: updated.status,
+        adminNote: updated.admin_note,
+      });
+    }
+
+    const existing = await prisma.emailSubscriber.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ error: "신청을 찾을 수 없습니다." }, { status: 404 });
+    }
 
     const updated = await prisma.emailSubscriber.update({
       where: { id },
@@ -38,6 +55,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 export async function DELETE(_request: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
+    if (isSupabaseEnabled()) {
+      await deleteSubscriberSupabase(id);
+      return NextResponse.json({ ok: true });
+    }
     const existing = await prisma.emailSubscriber.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: "신청을 찾을 수 없습니다." }, { status: 404 });

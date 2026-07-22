@@ -1,11 +1,12 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { LandingHeader } from "@/components/landing/LandingHeader";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingShell } from "@/components/landing/LandingShell";
 import { UserBottomNav } from "@/components/user/UserShell";
-import { AuctionSplitBoard } from "@/components/auction/split/AuctionSplitBoard";
+import { AuctionListBoard } from "@/components/auction/AuctionListBoard";
 import { serializeAuction } from "@/lib/auction-split-view";
 import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
@@ -16,7 +17,7 @@ import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 
 export const metadata: Metadata = {
   title: "경매물건 | 찬스부동산 경매중개",
-  description: "진행 중인 경매 목록과 상세를 한 화면에서 확인하세요.",
+  description: "찬스부동산이 등록한 경매물건 목록을 확인하세요.",
 };
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,9 @@ type PageProps = {
 export default async function AuctionsPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const openId = typeof params.id === "string" ? params.id : null;
+  if (openId) {
+    redirect(`/auctions/${openId}`);
+  }
 
   const items = await withDbFallback(
     "auctions-page",
@@ -42,6 +46,11 @@ export default async function AuctionsPage({ searchParams }: PageProps) {
     },
     [] as Auction[],
   );
+
+  const serialized = items.map(serializeAuction);
+  const recommended = serialized.filter((a) => a.featured).slice(0, 12);
+  const recommendStrip =
+    recommended.length > 0 ? recommended : serialized.slice(0, 8);
 
   return (
     <LandingShell>
@@ -61,10 +70,10 @@ export default async function AuctionsPage({ searchParams }: PageProps) {
               </div>
             }
           >
-            <AuctionSplitBoard
-              items={items.map(serializeAuction)}
-              initialId={openId}
-              totalCount={items.length}
+            <AuctionListBoard
+              items={serialized}
+              recommended={recommendStrip}
+              totalCount={serialized.length}
             />
           </Suspense>
         </div>

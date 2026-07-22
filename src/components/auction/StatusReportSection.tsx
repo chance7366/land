@@ -72,9 +72,11 @@ type Props = {
   title?: string;
   report: StatusReport;
   autoFilled?: boolean;
-  onChange: (next: StatusReport) => void;
+  onChange?: (next: StatusReport) => void;
   /** true면 섹션 번호 헤더(GlassCard 래핑) 없이 서식만 */
   bare?: boolean;
+  /** 사용자 상세 등 읽기 전용 */
+  readOnly?: boolean;
 };
 
 /** 법원 현황조사서 팝업과 동일한 입력 서식 — 항상 필드 구조 노출 */
@@ -85,16 +87,19 @@ export function StatusReportSection({
   autoFilled = false,
   onChange,
   bare = false,
+  readOnly = false,
 }: Props) {
-  const cls = autoFilled ? autoClass : inputClass;
+  const cls = `${autoFilled ? autoClass : inputClass}${readOnly ? " cursor-default" : ""}`;
   const leases = report.leases.length ? report.leases : [emptyLeaseRow(1)];
   const lease = leases[0];
 
   function patch(partial: Partial<StatusReport>) {
+    if (readOnly || !onChange) return;
     onChange({ ...report, available: true, leases, ...partial });
   }
 
   function patchLease(partial: Partial<StatusLeaseRow>) {
+    if (readOnly || !onChange) return;
     const nextLeases = leases.map((row, i) => (i === 0 ? { ...row, ...partial } : row));
     onChange({ ...report, available: true, leases: nextLeases });
   }
@@ -107,6 +112,7 @@ export function StatusReportSection({
           <input
             className={cls}
             value={report.court}
+            readOnly={readOnly}
             onChange={(e) => patch({ court: e.target.value })}
             placeholder="홍성지원"
           />
@@ -116,6 +122,7 @@ export function StatusReportSection({
             <input
               className={`${cls} max-w-[6rem]`}
               value={report.ordRound}
+              readOnly={readOnly}
               onChange={(e) => patch({ ordRound: e.target.value })}
               placeholder="1"
             />
@@ -144,6 +151,7 @@ export function StatusReportSection({
                   <input
                     className={cls}
                     value={report.caseLabel}
+                    readOnly={readOnly}
                     onChange={(e) => patch({ caseLabel: e.target.value })}
                     placeholder="2026타경15044 부동산강제경매"
                   />
@@ -155,6 +163,7 @@ export function StatusReportSection({
                   <input
                     className={cls}
                     value={report.surveyedAt}
+                    readOnly={readOnly}
                     onChange={(e) => patch({ surveyedAt: e.target.value })}
                     placeholder="2026년02월02일13시50분"
                   />
@@ -185,7 +194,9 @@ export function StatusReportSection({
                     <input
                       className={cls}
                       value={row.address}
+                      readOnly={readOnly}
                       onChange={(e) => {
+                        if (readOnly || !onChange) return;
                         const next = leases.map((r, i) =>
                           i === idx ? { ...r, address: e.target.value } : r,
                         );
@@ -198,7 +209,9 @@ export function StatusReportSection({
                     <input
                       className={cls}
                       value={row.leaseCountLabel}
+                      readOnly={readOnly}
                       onChange={(e) => {
+                        if (readOnly || !onChange) return;
                         const next = leases.map((r, i) =>
                           i === idx ? { ...r, leaseCountLabel: e.target.value } : r,
                         );
@@ -224,6 +237,7 @@ export function StatusReportSection({
           <input
             className={`${cls} max-w-xs`}
             value={report.photoLabel}
+            readOnly={readOnly}
             onChange={(e) =>
               patch({
                 photoLabel: e.target.value,
@@ -232,13 +246,15 @@ export function StatusReportSection({
             }
             placeholder="전경도 4건"
           />
-          <button
-            type="button"
-            className="rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-xs text-slate-300 hover:border-[#4dabff]/40"
-            onClick={() => alert("샘플: 전경도 사진보기 (프로덕션 연동 예정)")}
-          >
-            사진보기
-          </button>
+          {!readOnly ? (
+            <button
+              type="button"
+              className="rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-xs text-slate-300 hover:border-[#4dabff]/40"
+              onClick={() => alert("샘플: 전경도 사진보기 (프로덕션 연동 예정)")}
+            >
+              사진보기
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -257,6 +273,7 @@ export function StatusReportSection({
                   <input
                     className={cls}
                     value={report.possessionAddress}
+                    readOnly={readOnly}
                     onChange={(e) => patch({ possessionAddress: e.target.value })}
                     placeholder="1. … 103동 5층501호"
                   />
@@ -270,6 +287,7 @@ export function StatusReportSection({
                   <input
                     className={cls}
                     value={report.possessionRelation}
+                    readOnly={readOnly}
                     onChange={(e) => patch({ possessionRelation: e.target.value })}
                     placeholder="임차인(별지)점유"
                   />
@@ -283,6 +301,7 @@ export function StatusReportSection({
                   <textarea
                     className={`${cls} min-h-[110px] whitespace-pre-wrap`}
                     value={report.possessionEtc}
+                    readOnly={readOnly}
                     onChange={(e) => patch({ possessionEtc: e.target.value })}
                     placeholder="- 임차인 배우자 통화 내용…"
                   />
@@ -320,6 +339,7 @@ export function StatusReportSection({
               <input
                 className={cls}
                 value={lease[key]}
+                readOnly={readOnly}
                 onChange={(e) => patchLease({ [key]: e.target.value })}
                 placeholder={ph}
               />
@@ -331,6 +351,7 @@ export function StatusReportSection({
           <textarea
             className={`${cls} min-h-[110px] whitespace-pre-wrap`}
             value={lease.leaseEtc}
+            readOnly={readOnly}
             onChange={(e) => patchLease({ leaseEtc: e.target.value })}
             placeholder="- 월세 계약서·전입세대열람 비고…"
           />

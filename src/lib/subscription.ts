@@ -1,6 +1,8 @@
-export type SubscriptionType = "REAL_ESTATE" | "AUCTION";
+export type SubscriptionType = "REAL_ESTATE" | "AUCTION" | "NEWS";
 export type NotifyChannel = "EMAIL" | "SMS" | "KAKAO";
 export type SubscriberStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export type NewsDigestSourceId = "naver" | "r114" | "rtech";
 
 export type RealEstatePreferences = {
   categories: string[];
@@ -17,11 +19,19 @@ export type AuctionPreferences = {
   appraisalMax?: number | null;
 };
 
-export type SubscriptionPreferences = RealEstatePreferences | AuctionPreferences;
+export type NewsPreferences = {
+  sources: NewsDigestSourceId[];
+};
+
+export type SubscriptionPreferences =
+  | RealEstatePreferences
+  | AuctionPreferences
+  | NewsPreferences;
 
 export const SUBSCRIPTION_TYPE_LABEL: Record<SubscriptionType, string> = {
   REAL_ESTATE: "부동산매매 알림",
   AUCTION: "경매물건 알림",
+  NEWS: "부동산소식 알림",
 };
 
 export const CHANNEL_LABEL: Record<NotifyChannel, string> = {
@@ -29,6 +39,14 @@ export const CHANNEL_LABEL: Record<NotifyChannel, string> = {
   SMS: "문자",
   KAKAO: "카카오톡",
 };
+
+export const NEWS_ALERT_SOURCES: { value: NewsDigestSourceId; label: string }[] = [
+  { value: "naver", label: "네이버뉴스" },
+  { value: "r114", label: "부동산114" },
+  { value: "rtech", label: "부동산테크" },
+];
+
+export const DEFAULT_NEWS_SOURCES: NewsDigestSourceId[] = ["naver", "r114", "rtech"];
 
 export const PROPERTY_ALERT_CATEGORIES = [
   { value: "APARTMENT", label: "아파트" },
@@ -53,6 +71,11 @@ export const ALERT_REGIONS = ["홍성군", "예산군", "보령시", "서산시"
 export const AUCTION_ALERT_TYPES = ["아파트", "주택", "상가", "토지", "공장"] as const;
 
 const CHANNELS: NotifyChannel[] = ["EMAIL", "SMS", "KAKAO"];
+const NEWS_SOURCE_SET = new Set<string>(DEFAULT_NEWS_SOURCES);
+
+export function isNewsDigestSourceId(value: string): value is NewsDigestSourceId {
+  return NEWS_SOURCE_SET.has(value);
+}
 
 export function parseChannels(raw: unknown): NotifyChannel[] {
   if (typeof raw === "string") {
@@ -79,6 +102,16 @@ export function parsePreferences(type: SubscriptionType, raw: unknown): Subscrip
       : raw && typeof raw === "object"
         ? (raw as Record<string, unknown>)
         : {};
+
+  if (type === "NEWS") {
+    const sources = Array.isArray(obj.sources)
+      ? obj.sources
+          .filter((s): s is string => typeof s === "string")
+          .map((s) => s.trim())
+          .filter(isNewsDigestSourceId)
+      : [];
+    return { sources: sources.length ? sources : [...DEFAULT_NEWS_SOURCES] };
+  }
 
   const regions = Array.isArray(obj.regions)
     ? obj.regions.filter((r): r is string => typeof r === "string" && r.trim().length > 0).map((r) => r.trim())
@@ -143,11 +176,19 @@ export function validateSubscriptionBody(body: unknown): ValidationResult {
   }
   const b = body as Record<string, unknown>;
   const subscriptionType = b.subscriptionType;
-  if (subscriptionType !== "REAL_ESTATE" && subscriptionType !== "AUCTION") {
+  if (
+    subscriptionType !== "REAL_ESTATE" &&
+    subscriptionType !== "AUCTION" &&
+    subscriptionType !== "NEWS"
+  ) {
     return { ok: false, error: "알림 유형을 선택해 주세요." };
   }
 
-  const channels = parseChannels(b.channels);
+  let channels = parseChannels(b.channels);
+  if (subscriptionType === "NEWS") {
+    // 부동산소식은 메일링 전용
+    channels = ["EMAIL"];
+  }
   if (channels.length === 0) {
     return { ok: false, error: "알림 수단을 하나 이상 선택해 주세요." };
   }
@@ -181,7 +222,12 @@ export function validateSubscriptionBody(body: unknown): ValidationResult {
 
   const preferences = parsePreferences(subscriptionType, b.preferences);
 
-  if (subscriptionType === "REAL_ESTATE") {
+  if (subscriptionType === "NEWS") {
+    const p = preferences as NewsPreferences;
+    if (!p.sources.length) {
+      return { ok: false, error: "소식 출처를 하나 이상 선택해 주세요." };
+    }
+  } else if (subscriptionType === "REAL_ESTATE") {
     const p = preferences as RealEstatePreferences;
     if (!p.regions.length || !p.categories.length || !p.deals.length) {
       return { ok: false, error: "관심 지역·매물 유형·거래 유형을 선택해 주세요." };
@@ -218,6 +264,13 @@ export function summarizePreferences(
   type: SubscriptionType,
   preferences: SubscriptionPreferences,
 ): string {
+  if (type === "NEWS") {
+    const p = preferences as NewsPreferences;
+    const labels = p.sources
+      .map((s) => NEWS_ALERT_SOURCES.find((x) => x.value === s)?.label ?? s)
+      .join(" · ");
+    return labels || "출처 미선택";
+  }
   if (type === "REAL_ESTATE") {
     const p = preferences as RealEstatePreferences;
     const cats = p.categories

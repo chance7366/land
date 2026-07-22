@@ -79,7 +79,7 @@ export function FeaturedPicks({ properties, auctions }: FeaturedPicksProps) {
             }
             const headline = [auction.itemType, ...areaParts].filter(Boolean).join(" · ");
             return (
-              <Link key={auction.id} href={`/auctions?id=${encodeURIComponent(auction.id)}`} className={cardClass}>
+              <Link key={auction.id} href={`/auctions/${encodeURIComponent(auction.id)}`} className={cardClass}>
                 <div className="relative aspect-[16/10] bg-[#141414]">
                   {cover ? (
                     <Image

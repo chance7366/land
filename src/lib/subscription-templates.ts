@@ -313,7 +313,7 @@ export function propertyAlertEmail(property: Property, unsubscribeToken: string)
 }
 
 export function auctionAlertEmail(auction: Auction, unsubscribeToken: string) {
-  const url = `${appBaseUrl()}/auctions?id=${encodeURIComponent(auction.id)}`;
+  const url = `${appBaseUrl()}/auctions/${encodeURIComponent(auction.id)}`;
   const unsub = `${appBaseUrl()}/unsubscribe?token=${unsubscribeToken}`;
   const itemType =
     auction.itemType?.trim() || auction.auctionType?.trim() || auction.auctionTarget?.trim() || "경매물건";
@@ -511,7 +511,7 @@ export function propertyAlertSms(property: Property, ctx: AlertMessageContext): 
 
 /** LMS · 알림톡 대체문자 (경매) */
 export function auctionAlertSms(auction: Auction, ctx: AlertMessageContext): string {
-  const url = `${appBaseUrl()}/auctions?id=${encodeURIComponent(auction.id)}`;
+  const url = `${appBaseUrl()}/auctions/${encodeURIComponent(auction.id)}`;
   const unsub = unsubscribeUrl(ctx.unsubscribeToken);
   const itemType =
     auction.itemType?.trim() || auction.auctionType?.trim() || auction.auctionTarget?.trim() || "경매물건";
@@ -592,7 +592,7 @@ export function auctionKakaoVariables(
     "#{감정가}": clip(formatAuctionMoney(auction.appraisalPrice), 30),
     "#{최저가}": clip(formatAuctionMoney(minSource), 30),
     "#{DDay}": clip(dDay, 10),
-    "#{링크}": `${appBaseUrl()}/auctions?id=${encodeURIComponent(auction.id)}`,
+    "#{링크}": `${appBaseUrl()}/auctions/${encodeURIComponent(auction.id)}`,
     "#{문의전화}": BUSINESS.tel,
     "#{수신거부}": unsubscribeUrl(ctx.unsubscribeToken),
   };

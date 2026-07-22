@@ -48,7 +48,7 @@ export function UserDashboard({ data }: { data: HomeData }) {
         <DashboardSectionHeader title="경매물건추천" count={`${data.counts.auctions}건`} id="auctions-heading" />
         <DashboardPanel borderClass={DASHBOARD_SECTION_BORDERS.auctions} className="bg-surface-container-low">
           {featuredAuction && (
-            <DashboardListCard href={`/auctions?id=${encodeURIComponent(featuredAuction.id)}`} accentBorderClass="border-l-4 border-l-primary-container">
+            <DashboardListCard href={`/auctions/${encodeURIComponent(featuredAuction.id)}`} accentBorderClass="border-l-4 border-l-primary-container">
               <div className="mb-2 flex items-start justify-between gap-2">
                 <span className="font-caption text-on-surface-variant">{featuredAuction.caseNumber}</span>
                 <span className="font-caption font-bold text-secondary-fixed">안전</span>
@@ -59,7 +59,7 @@ export function UserDashboard({ data }: { data: HomeData }) {
               <h3 className="font-card-title">{featuredAuction.title}</h3>
               <p className="font-caption mt-1 text-on-surface-variant">{featuredAuction.description}</p>
               <div className="mt-3">
-                <DashboardCta href={`/auctions?id=${encodeURIComponent(featuredAuction.id)}`} variant="outline" className="py-2">
+                <DashboardCta href={`/auctions/${encodeURIComponent(featuredAuction.id)}`} variant="outline" className="py-2">
                   분석 리포트
                 </DashboardCta>
               </div>
@@ -67,7 +67,7 @@ export function UserDashboard({ data }: { data: HomeData }) {
           )}
           <div className="space-y-3 px-1 max-h-[420px] overflow-y-auto custom-scrollbar">
             {data.auctions.slice(1, 11).map((item) => (
-              <DashboardListCard key={item.id} href={`/auctions?id=${encodeURIComponent(item.id)}`}>
+              <DashboardListCard key={item.id} href={`/auctions/${encodeURIComponent(item.id)}`}>
                 <div className="flex justify-between gap-2">
                   <h4 className="font-card-title truncate group-hover:text-primary">{item.title}</h4>
                   <span className="font-meta-bold shrink-0 text-primary">D-{item.dDay}</span>

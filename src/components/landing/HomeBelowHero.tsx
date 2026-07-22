@@ -81,7 +81,7 @@ function CompactAuctionCard({ auction }: { auction: Auction }) {
 
   return (
     <Link
-      href={`/auctions?id=${auction.id}`}
+      href={`/auctions/${auction.id}`}
       className="featured-marquee-card group relative block w-[168px] shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/[0.06] transition hover:border-[#d4af37]/45"
     >
       <div className="relative h-[88px] bg-black/40">
