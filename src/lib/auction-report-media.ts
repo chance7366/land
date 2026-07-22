@@ -4,6 +4,7 @@ import {
   biddingValuationAttachments,
   courtDocAttachments,
   labelForAttachmentType,
+  locationAnalysisAttachments,
   parseAuctionAttachments,
   type AuctionAttachment,
   type AuctionAttachmentType,
@@ -21,8 +22,8 @@ export type ReportMediaPart = {
   textContent?: string;
 };
 
-/** 법원 서류 + 적정가치평가 첨부 합산 상한 */
-const MAX_FILES = 18;
+/** 법원 서류 + 적정가치평가 + 입지분석 첨부 합산 상한 */
+const MAX_FILES = 24;
 const MAX_BYTES = 12 * 1024 * 1024;
 const MAX_TEXT_CHARS = 80_000;
 
@@ -165,6 +166,7 @@ async function loadOneAttachment(
  * 리포트용 미디어 로드.
  * - 법원 서류 슬롯: PDF/이미지 (권리분석)
  * - 적정가치평가 슬롯: PDF/이미지/TXT/CSV (시세·실거래)
+ * - 입지분석 슬롯: PDF/이미지/TXT/CSV (지도·인프라·호재)
  */
 export async function loadReportMediaParts(
   attachments: AuctionAttachment[],
@@ -175,6 +177,7 @@ export async function loadReportMediaParts(
   const ordered = [
     ...courtDocAttachments(attachments),
     ...biddingValuationAttachments(attachments),
+    ...locationAnalysisAttachments(attachments),
   ];
 
   for (const att of ordered) {

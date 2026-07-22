@@ -27,7 +27,7 @@ const MEMBER_SECTIONS = [
   "1. 물건 기본 정보 및 물리적 하자 분석 (Overview)",
   "2. 심층 권리분석 (Risk Assessment)",
   "3. 적정 가치 평가",
-  "4. 입지 및 상권 상세 분석 (Location) — 상세 지침 대기 포함",
+  "4. 입지분석 — Track A/B · 대시보드·5대 요소·총평",
   "5. 수익률 분석 (Valuation & Yield) — 상세 지침 대기 포함",
   "6. 명도 계획 및 출구 전략 (Exit Strategy) — 상세 지침 대기 포함",
   "7. 최종 결론 및 추천 입찰가 (Final Recommendation) — 상세 지침 대기 포함",

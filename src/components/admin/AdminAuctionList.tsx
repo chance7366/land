@@ -2,24 +2,16 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search } from "lucide-react";
+import { ExternalLink, Search } from "lucide-react";
 import { AppLink as Link } from "@/components/ui/AppLink";
 import { DataTable } from "@/components/ui/DataTable";
 import type { Auction } from "@prisma/client";
-import { formatAuctionMoney, formatDateYmd } from "@/lib/format";
-
-function statusLabel(status: string) {
-  switch (status) {
-    case "ONGOING":
-      return "진행중";
-    case "CLOSED":
-      return "종결";
-    case "FAILED":
-      return "유찰";
-    default:
-      return status;
-  }
-}
+import {
+  auctionAreaLabel,
+  auctionStatusDisplay,
+  formatAuctionPriceLine,
+} from "@/lib/auction-list-display";
+import { formatDateYmd, parseImages } from "@/lib/format";
 
 /** 목록에는 소재지1만 표시 (address2·개행 결합분 제외) */
 function addressPrimary(item: Auction): string {
@@ -137,95 +129,144 @@ export function AdminAuctionList({ items }: { items: Auction[] }) {
       )}
 
       <DataTable maxHeight="520px" className="mt-4">
-        <table>
+        <table className="w-full min-w-[1100px] border-collapse text-left text-xs text-[#cbd5e1]">
           <thead>
-            <tr>
-              {[
-                "관리번호",
-                "물건종류",
-                "사건번호",
-                "소재지",
-                "감정가",
-                "최저가",
-                "매각기일",
-                "상태",
-                "리포트",
-                "관리",
-              ].map((h) => (
-                <th
-                  key={h}
-                  className="p-3 text-center text-xs font-semibold uppercase tracking-wide text-landing-muted"
-                >
-                  {h}
-                </th>
-              ))}
+            <tr className="border-b border-white/10 bg-black/35 text-[11px] text-white/45">
+              <th className="w-[100px] px-3 py-3 text-center font-semibold">관리번호</th>
+              <th className="w-[88px] px-3 py-3 font-semibold">사진</th>
+              <th className="w-[140px] px-3 py-3 font-semibold">용도/사건</th>
+              <th className="min-w-[180px] px-3 py-3 font-semibold">소재지 / 면적</th>
+              <th className="w-[120px] px-3 py-3 font-semibold">감정/최저가</th>
+              <th className="w-[96px] px-3 py-3 font-semibold">현재상태</th>
+              <th className="w-[110px] px-3 py-3 font-semibold">매각기일</th>
+              <th className="w-[100px] px-3 py-3 text-center font-semibold">리포트</th>
+              <th className="w-[96px] px-3 py-3 text-center font-semibold">관리</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={10} className="p-8 text-center text-sm text-landing-muted">
+                <td colSpan={9} className="px-4 py-16 text-center text-sm text-white/40">
                   검색 결과가 없습니다.
                 </td>
               </tr>
             ) : (
               filtered.map((item) => {
-                const minPrice = item.minPrice ?? item.recommendedPrice;
+                const cover = parseImages(item.images)[0];
+                const min = item.minPrice ?? item.recommendedPrice;
+                const st = auctionStatusDisplay({
+                  status: item.status,
+                  rightsAnalysis: item.rightsAnalysis,
+                  appraisalPrice: item.appraisalPrice,
+                  minPrice: min,
+                });
+                const generalUrl =
+                  (item as { generalReportUrl?: string | null }).generalReportUrl?.trim() ||
+                  null;
+                const memberUrl = item.reportUrl?.trim() || null;
+
                 return (
-                  <tr key={item.id}>
-                    <td className="p-3 text-center text-sm font-medium tabular-nums text-[#d4bfff] whitespace-nowrap">
-                      {item.manageCode || "—"}
+                  <tr
+                    key={item.id}
+                    className="border-b border-white/5 transition hover:bg-white/[0.04]"
+                  >
+                    <td className="px-3 py-2.5 text-center align-middle">
+                      <span className="whitespace-nowrap text-[11px] font-bold tabular-nums text-[#d4bfff]">
+                        {item.manageCode || "—"}
+                      </span>
                     </td>
-                    <td className="p-3 text-center text-sm font-medium text-landing-text">
-                      {item.itemType || "—"}
+                    <td className="px-3 py-2.5">
+                      <Link
+                        href={`/admin/auctions/${item.id}/edit`}
+                        className="block h-[64px] w-[72px] overflow-hidden rounded-lg bg-black/40"
+                      >
+                        {cover ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={cover} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="flex h-full items-center justify-center text-white/20">
+                            <span className="material-symbols-outlined text-2xl">gavel</span>
+                          </span>
+                        )}
+                      </Link>
                     </td>
-                    <td className="p-3 text-center text-sm tabular-nums font-medium text-landing-text">
-                      {item.caseNumber}
+                    <td className="px-3 py-2.5 align-top">
+                      <Link href={`/admin/auctions/${item.id}/edit`} className="block space-y-0.5">
+                        <p className="font-bold text-white">{item.itemType || "경매"}</p>
+                        <p className="tabular-nums text-white/80">{item.caseNumber}</p>
+                        <p className="text-[11px] text-white/40">{item.court || "—"}</p>
+                      </Link>
                     </td>
-                    <td className="max-w-[240px] p-3 text-left text-sm text-landing-text">
-                      <p className="line-clamp-2" title={addressPrimary(item)}>
-                        {addressPrimary(item)}
-                      </p>
+                    <td className="px-3 py-2.5 align-top">
+                      <Link href={`/admin/auctions/${item.id}/edit`} className="block space-y-1">
+                        <p className="line-clamp-2 font-medium text-white/90" title={addressPrimary(item)}>
+                          {addressPrimary(item)}
+                        </p>
+                        <p className="text-[11px] font-bold text-rose-400">
+                          {auctionAreaLabel({
+                            landArea: item.landArea,
+                            buildingArea: item.buildingArea,
+                          })}
+                        </p>
+                      </Link>
                     </td>
-                    <td className="p-3 text-center text-sm font-bold text-blue-400 whitespace-nowrap">
-                      {formatAuctionMoney(item.appraisalPrice)}
+                    <td className="px-3 py-2.5 align-top tabular-nums">
+                      <Link href={`/admin/auctions/${item.id}/edit`} className="block space-y-0.5">
+                        <p className="font-bold text-white">
+                          {formatAuctionPriceLine(item.appraisalPrice)}
+                        </p>
+                        <p className="font-bold text-[#60a5fa]">{formatAuctionPriceLine(min)}</p>
+                      </Link>
                     </td>
-                    <td className="p-3 text-center text-sm font-bold text-[#d4af37] whitespace-nowrap">
-                      {formatAuctionMoney(minPrice)}
+                    <td className="px-3 py-2.5 align-top">
+                      <Link href={`/admin/auctions/${item.id}/edit`} className="block">
+                        <p className="font-bold text-white">{st.main}</p>
+                        {st.sub ? (
+                          <p className="text-[11px] font-semibold text-[#60a5fa]">{st.sub}</p>
+                        ) : null}
+                      </Link>
                     </td>
-                    <td className="p-3 text-center text-sm tabular-nums whitespace-nowrap">
-                      {item.saleDate ? formatDateYmd(item.saleDate) : `D-${item.dDay}`}
+                    <td className="px-3 py-2.5 align-top">
+                      <Link href={`/admin/auctions/${item.id}/edit`} className="block space-y-0.5">
+                        <p className="tabular-nums text-white/90">
+                          {item.saleDate ? formatDateYmd(item.saleDate) : "—"}
+                        </p>
+                        <p className="text-[11px] text-white/45">
+                          입찰 <span className="font-bold text-rose-400">{item.dDay}</span>
+                          일전
+                        </p>
+                      </Link>
                     </td>
-                    <td className="p-3 text-center text-sm">{statusLabel(item.status)}</td>
-                    <td className="p-3 text-center">
+                    <td className="px-3 py-2.5 align-middle text-center">
                       <div className="flex flex-wrap items-center justify-center gap-1.5">
-                        {(item as { generalReportUrl?: string | null }).generalReportUrl ? (
+                        {generalUrl ? (
                           <a
-                            href={(item as { generalReportUrl?: string | null }).generalReportUrl!}
+                            href={generalUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="rounded-md bg-sky-500/15 px-2 py-0.5 text-[11px] font-semibold text-sky-300 ring-1 ring-sky-400/25 hover:bg-sky-500/25"
+                            className="inline-flex items-center gap-1 rounded-md bg-sky-500/15 px-2 py-0.5 text-[11px] font-semibold text-sky-300 ring-1 ring-sky-400/25 hover:bg-sky-500/25"
                           >
                             일반
+                            <ExternalLink className="h-3 w-3" aria-hidden />
                           </a>
                         ) : null}
-                        {item.reportUrl ? (
+                        {memberUrl ? (
                           <a
-                            href={item.reportUrl}
+                            href={memberUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="rounded-md bg-violet-500/15 px-2 py-0.5 text-[11px] font-semibold text-violet-300 ring-1 ring-violet-400/25 hover:bg-violet-500/25"
+                            className="inline-flex items-center gap-1 rounded-md bg-violet-500/15 px-2 py-0.5 text-[11px] font-semibold text-violet-300 ring-1 ring-violet-400/25 hover:bg-violet-500/25"
                           >
                             회원
+                            <ExternalLink className="h-3 w-3" aria-hidden />
                           </a>
                         ) : null}
-                        {!item.reportUrl &&
-                        !(item as { generalReportUrl?: string | null }).generalReportUrl ? (
-                          <span className="text-sm text-landing-muted">—</span>
+                        {!generalUrl && !memberUrl ? (
+                          <span className="text-[11px] text-white/35">—</span>
                         ) : null}
                       </div>
                     </td>
-                    <td className="p-3 text-center">
+                    <td className="px-3 py-2.5 align-middle text-center">
                       <div className="flex items-center justify-center gap-2">
                         <Link
                           href={`/admin/auctions/${item.id}/edit`}

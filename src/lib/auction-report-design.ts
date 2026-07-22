@@ -164,8 +164,19 @@ export const REPORT_PDF_CSS = `
     line-height: 1.45;
   }
   table.table-kb-band td:nth-child(-n+3),
-  table.table-valuation td:nth-child(-n+2) {
+  table.table-valuation td:nth-child(-n+2),
+  table.table-location-dash td:nth-child(-n+2),
+  table.table-location-dash th:nth-child(-n+2) {
     white-space: nowrap;
+  }
+  /* 입지 대시보드: 항목·등급·핵심 한 줄 평 모두 가운데 */
+  table.table-location-dash th,
+  table.table-location-dash td {
+    text-align: center;
+  }
+  table.table-location-dash td:nth-child(3) {
+    white-space: normal;
+    line-height: 1.45;
   }
   blockquote {
     margin: 12px 0;
@@ -235,6 +246,10 @@ function enhanceTables(html: string): string {
     const isValuation =
       headers.some((h) => h.includes("평가 금액") || h === "평가금액") &&
       headers.some((h) => h.includes("가치 산정") || h.includes("핵심 논거"));
+    const isLocationDash =
+      headers.some((h) => h === "항목" || h.includes("항목")) &&
+      headers.some((h) => h === "등급" || h.includes("등급")) &&
+      headers.some((h) => h.includes("한 줄") || h.includes("한줄"));
 
     let className = "";
     let colgroup = "";
@@ -246,6 +261,10 @@ function enhanceTables(html: string): string {
       className = "table-valuation";
       colgroup =
         '<colgroup><col style="width:12%" /><col style="width:18%" /><col style="width:70%" /></colgroup>';
+    } else if (isLocationDash) {
+      className = "table-location-dash";
+      colgroup =
+        '<colgroup><col style="width:10%" /><col style="width:8%" /><col style="width:82%" /></colgroup>';
     }
 
     if (!className) return full;

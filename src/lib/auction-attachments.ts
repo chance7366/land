@@ -9,7 +9,7 @@ export type AuctionDocType =
   | "expectedDividend"
   | "yieldAnalysis";
 
-/** 입찰가 산정 자료 슬롯 */
+/** 입찰가 산정·적정가치평가 자료 슬롯 */
 export type BiddingValuationDocType =
   | "bidNpay"
   | "bidActualTrade"
@@ -19,10 +19,26 @@ export type BiddingValuationDocType =
   | "bidCostData"
   | "bidOther1"
   | "bidOther2"
+  /** @deprecated UI 제거 · 기존 첨부 파싱용 */
   | "bidOther3"
+  /** @deprecated UI 제거 · 기존 첨부 파싱용 */
   | "bidOther4";
 
-export type AuctionAttachmentType = AuctionDocType | BiddingValuationDocType;
+/** 입지분석 자료 슬롯 (관리자 폼 §9) */
+export type LocationAnalysisDocType =
+  | "locTransport"
+  | "locEducation"
+  | "locAmenities"
+  | "locEnvironment"
+  | "locFuture"
+  | "locMap"
+  | "locLandPlan"
+  | "locOther";
+
+export type AuctionAttachmentType =
+  | AuctionDocType
+  | BiddingValuationDocType
+  | LocationAnalysisDocType;
 
 export type AuctionAttachment = {
   type: AuctionAttachmentType;
@@ -93,20 +109,69 @@ export const BIDDING_VALUATION_SLOTS: {
     label: "기타2",
     placeholder: "기타 자료를 첨부하거나 직접 입력, 붙여넣으세요",
   },
+];
+
+export const LOCATION_ANALYSIS_SLOTS: {
+  type: LocationAnalysisDocType;
+  label: string;
+  placeholder: string;
+}[] = [
   {
-    type: "bidOther3",
-    label: "기타3",
-    placeholder: "기타 자료를 첨부하거나 직접 입력, 붙여넣으세요",
+    type: "locTransport",
+    label: "교통·접근성",
+    placeholder:
+      "지하철·버스·IC 거리/도보분, 업무지구 접근성 등을 첨부하거나 직접 입력, 붙여넣으세요",
   },
   {
-    type: "bidOther4",
-    label: "기타4",
-    placeholder: "기타 자료를 첨부하거나 직접 입력, 붙여넣으세요",
+    type: "locEducation",
+    label: "학군·교육",
+    placeholder: "초·중·고 거리, 학원가, 통학 동선 등을 첨부하거나 직접 입력, 붙여넣으세요",
+  },
+  {
+    type: "locAmenities",
+    label: "상권·편의",
+    placeholder:
+      "마트·백화점·병원·근린상권 등 생활 인프라를 첨부하거나 직접 입력, 붙여넣으세요",
+  },
+  {
+    type: "locEnvironment",
+    label: "환경·혐오시설",
+    placeholder:
+      "공원·녹지, 소음, 고압선·철도·유흥가·축사 등 혐오/비선호 시설을 첨부하거나 직접 입력하세요",
+  },
+  {
+    type: "locFuture",
+    label: "호재·개발계획",
+    placeholder:
+      "GTX·도로·재개발/재건축·신도시·산단 등 공적 계획·호재를 첨부하거나 직접 입력하세요",
+  },
+  {
+    type: "locMap",
+    label: "지도·지적·위성",
+    placeholder: "네이버/카카오 지도, 지적도, 위성사진 캡처를 첨부하거나 메모하세요",
+  },
+  {
+    type: "locLandPlan",
+    label: "토지이용·공법",
+    placeholder:
+      "토지이음·용도지역, 농진구역·보전산지·그린벨트 등 공법 규제를 첨부하거나 직접 입력하세요",
+  },
+  {
+    type: "locOther",
+    label: "기타",
+    placeholder: "입지 관련 기타 자료를 첨부하거나 직접 입력, 붙여넣으세요",
   },
 ];
 
+/** 삭제된 슬롯 — 기존 첨부 JSON 호환 */
+const LEGACY_BID_DOC_TYPES = ["bidOther3", "bidOther4"] as const;
+
 const COURT_DOC_TYPES = new Set<string>(AUCTION_DOC_SLOTS.map((s) => s.type));
-const BID_DOC_TYPES = new Set<string>(BIDDING_VALUATION_SLOTS.map((s) => s.type));
+const BID_DOC_TYPES = new Set<string>([
+  ...BIDDING_VALUATION_SLOTS.map((s) => s.type),
+  ...LEGACY_BID_DOC_TYPES,
+]);
+const LOC_DOC_TYPES = new Set<string>(LOCATION_ANALYSIS_SLOTS.map((s) => s.type));
 
 export function isAuctionDocType(type: string): type is AuctionDocType {
   return COURT_DOC_TYPES.has(type);
@@ -114,6 +179,10 @@ export function isAuctionDocType(type: string): type is AuctionDocType {
 
 export function isBiddingValuationDocType(type: string): type is BiddingValuationDocType {
   return BID_DOC_TYPES.has(type);
+}
+
+export function isLocationAnalysisDocType(type: string): type is LocationAnalysisDocType {
+  return LOC_DOC_TYPES.has(type);
 }
 
 /** 법원 서류 슬롯만 (리포트 Gemini 첨부용) */
@@ -126,11 +195,21 @@ export function biddingValuationAttachments(list: AuctionAttachment[]): AuctionA
   return list.filter((a) => isBiddingValuationDocType(a.type));
 }
 
+/** 입지분석 슬롯 첨부 */
+export function locationAnalysisAttachments(list: AuctionAttachment[]): AuctionAttachment[] {
+  return list.filter((a) => isLocationAnalysisDocType(a.type));
+}
+
 export function labelForAttachmentType(type: string): string {
   return (
     AUCTION_DOC_SLOTS.find((s) => s.type === type)?.label ??
     BIDDING_VALUATION_SLOTS.find((s) => s.type === type)?.label ??
-    type
+    LOCATION_ANALYSIS_SLOTS.find((s) => s.type === type)?.label ??
+    (type === "bidOther3"
+      ? "기타3"
+      : type === "bidOther4"
+        ? "기타4"
+        : type)
   );
 }
 
@@ -155,7 +234,13 @@ export function parseAuctionAttachments(json: string | null | undefined): Auctio
         typeof item.type === "string"
       ) {
         const type = item.type as AuctionAttachmentType;
-        if (!isAuctionDocType(type) && !isBiddingValuationDocType(type)) continue;
+        if (
+          !isAuctionDocType(type) &&
+          !isBiddingValuationDocType(type) &&
+          !isLocationAnalysisDocType(type)
+        ) {
+          continue;
+        }
         out.push({
           type,
           url: item.url,
@@ -209,9 +294,68 @@ export function stringifyBiddingValuationNotes(notes: BiddingValuationNotes): st
     const t = notes[slot.type]?.trim();
     if (t) cleaned[slot.type] = t;
   }
+  // legacy keys 유지
+  for (const k of LEGACY_BID_DOC_TYPES) {
+    const t = notes[k]?.trim();
+    if (t) cleaned[k] = t;
+  }
   return JSON.stringify(cleaned);
 }
 
 export function hasBiddingValuationNotes(notes: BiddingValuationNotes): boolean {
-  return BIDDING_VALUATION_SLOTS.some((s) => Boolean(notes[s.type]?.trim()));
+  return (
+    BIDDING_VALUATION_SLOTS.some((s) => Boolean(notes[s.type]?.trim())) ||
+    LEGACY_BID_DOC_TYPES.some((k) => Boolean(notes[k]?.trim()))
+  );
+}
+
+export type LocationAnalysisNotes = Partial<Record<LocationAnalysisDocType, string>>;
+
+export function emptyLocationAnalysisNotes(): LocationAnalysisNotes {
+  return {};
+}
+
+export function parseLocationAnalysisNotes(raw: string | null | undefined): LocationAnalysisNotes {
+  if (!raw?.trim()) return {};
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const out: LocationAnalysisNotes = {};
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+      if (!isLocationAnalysisDocType(k)) continue;
+      if (typeof v === "string" && v.trim()) out[k] = v;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export function stringifyLocationAnalysisNotes(notes: LocationAnalysisNotes): string {
+  const cleaned: LocationAnalysisNotes = {};
+  for (const slot of LOCATION_ANALYSIS_SLOTS) {
+    const t = notes[slot.type]?.trim();
+    if (t) cleaned[slot.type] = t;
+  }
+  return JSON.stringify(cleaned);
+}
+
+export function hasLocationAnalysisNotes(notes: LocationAnalysisNotes): boolean {
+  return LOCATION_ANALYSIS_SLOTS.some((s) => Boolean(notes[s.type]?.trim()));
+}
+
+/** rightsAnalysis 내 입지분석 텍스트 블록을 리포트용으로 펼침 */
+export function formatLocationAnalysisNotesForPrompt(
+  rightsAnalysis: string | null | undefined,
+): string {
+  if (!rightsAnalysis?.trim()) return "(입지분석 텍스트 슬롯 없음)";
+  const m = /\[입지분석텍스트JSON\]\s*([\s\S]*?)(?=\n\s*\[|$)/.exec(rightsAnalysis);
+  const notes = parseLocationAnalysisNotes(m?.[1]?.trim() ?? "");
+  const lines: string[] = [];
+  for (const slot of LOCATION_ANALYSIS_SLOTS) {
+    const t = notes[slot.type]?.trim();
+    if (!t) continue;
+    lines.push(`### ${slot.label}`, t, "");
+  }
+  return lines.length ? lines.join("\n").trim() : "(입지분석 텍스트 슬롯 비어 있음)";
 }
