@@ -231,12 +231,31 @@ export async function runNewsFeedCollectionForSources(keys: NewsFeedSourceId[]) 
   const allKeys = NEWS_FEED_SOURCES.map((s) => s.key);
   const isFull = unique.length >= allKeys.length && allKeys.every((k) => unique.includes(k));
 
-  const pruned = isFull ? await pruneExpiredNewsFeedItems() : 0;
-  const cleaned = await cleanupStaleNewsFeedItems();
+  const skipCleanup = process.env.NEWS_FEED_SKIP_CLEANUP === "1";
+  const pruned = isFull && !skipCleanup ? await pruneExpiredNewsFeedItems() : 0;
+  if (!skipCleanup) {
+    console.log("[news-feed] cleanup start…");
+  }
+  const cleaned = skipCleanup ? 0 : await cleanupStaleNewsFeedItems();
+  if (!skipCleanup) {
+    console.log("[news-feed] cleanup done", cleaned);
+  }
+  console.log("[news-feed] collect start", unique.join(","));
   const { items, perSource } = isFull
     ? await collectAllSources()
     : await collectSelectedSources(unique);
+  console.log(
+    "[news-feed] collect done items=",
+    items.length,
+    "perSource=",
+    JSON.stringify(perSource),
+  );
   const result = await upsertNewsFeedItems(items);
+  console.log("[news-feed] upsert done", {
+    created: result.created,
+    updated: result.updated,
+    failed: result.failed.length,
+  });
 
   const sourceEntries = Object.entries(perSource);
   const failedSources = sourceEntries.filter(([, v]) => !v.ok);

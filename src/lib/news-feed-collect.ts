@@ -1217,16 +1217,25 @@ export async function collectSelectedSources(
   const all: CollectedNewsItem[] = [];
 
   for (const key of keys) {
+    const started = Date.now();
+    console.log(`[news-feed] source start: ${key}`);
     try {
       const items = await ADAPTERS[key]();
       perSource[key] = { ok: true, count: items.length };
       all.push(...items);
+      console.log(
+        `[news-feed] source ok: ${key} count=${items.length} ${Date.now() - started}ms`,
+      );
     } catch (err) {
       perSource[key] = {
         ok: false,
         count: 0,
         error: err instanceof Error ? err.message : "collect failed",
       };
+      console.error(
+        `[news-feed] source fail: ${key} ${Date.now() - started}ms`,
+        err,
+      );
     }
   }
 

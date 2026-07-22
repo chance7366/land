@@ -611,7 +611,7 @@ export function PropertyForm({ initial }: PropertyFormProps) {
         </Section>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-[#0B0F19]/92 px-4 py-3 backdrop-blur-md md:left-[var(--admin-sidebar-w,0px)]">
+      <div className="fixed bottom-[calc(3.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 border-t border-white/10 bg-[#0B0F19]/92 px-4 py-3 backdrop-blur-md md:bottom-0 md:left-56">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-slate-500">
             {isEdit ? (
