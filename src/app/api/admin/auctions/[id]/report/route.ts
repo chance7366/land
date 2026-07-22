@@ -27,6 +27,7 @@ import {
   loadReportMediaParts,
 } from "@/lib/auction-report-media";
 import { markdownToPdfBuffer } from "@/lib/auction-report-pdf";
+import { saveReportMarkdown } from "@/lib/auction-report-markdown";
 import {
   stripGeneralReportExtraSections,
   type AuctionReportSource,
@@ -232,6 +233,12 @@ export async function POST(request: NextRequest, { params }: Params) {
   } catch (e) {
     console.error("[auctions/report] upload", e);
     return NextResponse.json({ error: "PDF 업로드에 실패했습니다." }, { status: 500 });
+  }
+
+  try {
+    await saveReportMarkdown(id, markdown, kind);
+  } catch (e) {
+    console.warn("[auctions/report] markdown 저장 실패 (블로그 복사 불가할 수 있음)", e);
   }
 
   try {

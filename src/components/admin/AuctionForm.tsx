@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   CheckCircle2,
+  Copy,
   ExternalLink,
   FileText,
   ImagePlus,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 import type { Auction } from "@prisma/client";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { AppLink as Link } from "@/components/ui/AppLink";
 import { navigateTo } from "@/lib/navigate";
 import { parseImages } from "@/lib/format";
 import { suggestAuctionTitle } from "@/lib/auction-title";
@@ -1233,7 +1235,9 @@ export function AuctionForm({ initial }: AuctionFormProps) {
           data.mediaCount != null && data.mediaCount > 0
             ? ` · 첨부 ${data.mediaCount}건${data.imageModelUsed ? " · 이미지모델" : ""}`
             : "";
-        setToast(`${kindLabel} PDF 생성 완료 (${modelLabel})${media}${cost}`);
+        setToast(
+          `${kindLabel} PDF 생성 완료 (${modelLabel})${media}${cost} · 블로그용 복사 가능`,
+        );
       } else {
         setError("리포트 URL을 받지 못했습니다.");
       }
@@ -2398,15 +2402,24 @@ export function AuctionForm({ initial }: AuctionFormProps) {
                         {busy ? "리포트 생성 중…" : `${card.title} 생성`}
                       </button>
                       {card.url ? (
-                        <a
-                          href={card.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-200 hover:bg-emerald-500/20"
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                          {card.title} 보기
-                        </a>
+                        <>
+                          <a
+                            href={card.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-200 hover:bg-emerald-500/20"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                            {card.title} 보기
+                          </a>
+                          <Link
+                            href={`/admin/auctions/${initial.id}/report/${card.kind}/blog`}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-[#f5e6d3]/35 bg-[#6B5344]/45 px-4 py-2.5 text-sm font-bold text-[#f5e6d3] hover:bg-[#6B5344]/60"
+                          >
+                            <Copy className="h-4 w-4" />
+                            블로그용 복사
+                          </Link>
+                        </>
                       ) : null}
                     </div>
                   </div>

@@ -286,6 +286,65 @@ function enhanceTables(html: string): string {
   });
 }
 
+/**
+ * 블로그 붙여넣기용 — 표 셀에 인라인 배경·테두리 색을 심습니다.
+ * 네이버 등은 style 태그/class를 제거하므로, 복사 시 인라인이 필요합니다.
+ */
+export function inlineReportTableStyles(html: string): string {
+  const thStyle =
+    `background-color:${REPORT_DESIGN.tableHead};color:${REPORT_DESIGN.brownDark};` +
+    `font-weight:700;text-align:center;vertical-align:middle;` +
+    `border:1px solid ${REPORT_DESIGN.border};padding:8px 10px;word-break:keep-all`;
+  const tdBase =
+    `text-align:center;vertical-align:middle;` +
+    `border:1px solid ${REPORT_DESIGN.border};padding:8px 10px;word-break:keep-all;` +
+    `color:${REPORT_DESIGN.body}`;
+  const tableStyle =
+    `border-collapse:collapse;width:100%;margin:12px 0 16px;font-size:9.5pt;` +
+    `border:1px solid ${REPORT_DESIGN.border}`;
+
+  return html.replace(/<table([^>]*)>([\s\S]*?)<\/table>/gi, (_full, attrs: string, inner: string) => {
+    let nextAttrs = attrs;
+    if (/\bstyle\s*=/.test(attrs)) {
+      nextAttrs = attrs.replace(/\bstyle\s*=\s*(["'])([^"']*)\1/i, (_, q, s) => {
+        return `style=${q}${s};${tableStyle}${q}`;
+      });
+    } else {
+      nextAttrs = `${attrs} style="${tableStyle}"`;
+    }
+
+    let rowIndex = 0;
+    const nextInner = inner.replace(/<tr([^>]*)>([\s\S]*?)<\/tr>/gi, (trFull, trAttrs: string, trInner: string) => {
+      const isAddress = /\baddress-row\b/.test(trAttrs);
+      const hasTh = /<th[\s>]/i.test(trInner);
+      if (!hasTh) rowIndex += 1;
+      const stripe = !hasTh && rowIndex % 2 === 0;
+      const tdBg = isAddress || stripe ? REPORT_DESIGN.tableStripe : "#FFFFFF";
+      const tdAlign = isAddress ? "left" : "center";
+
+      const cells = trInner
+        .replace(/<th([^>]*)>/gi, (_m, a: string) => {
+          if (/\bstyle\s*=/.test(a)) {
+            return `<th${a.replace(/\bstyle\s*=\s*(["'])([^"']*)\1/i, (_, q, s) => `style=${q}${s};${thStyle}${q}`)}>`;
+          }
+          return `<th${a} style="${thStyle}">`;
+        })
+        .replace(/<td([^>]*)>/gi, (_m, a: string) => {
+          const st =
+            `${tdBase};background-color:${tdBg};text-align:${tdAlign}`;
+          if (/\bstyle\s*=/.test(a)) {
+            return `<td${a.replace(/\bstyle\s*=\s*(["'])([^"']*)\1/i, (_, q, s) => `style=${q}${s};${st}${q}`)}>`;
+          }
+          return `<td${a} style="${st}">`;
+        });
+
+      return `<tr${trAttrs}>${cells}</tr>`;
+    });
+
+    return `<table${nextAttrs}>${nextInner}</table>`;
+  });
+}
+
 /** marked HTML에 배지·요약박스·표 클래스를 입힙니다. */
 export function enhanceReportHtml(html: string): string {
   let out = html.replace(

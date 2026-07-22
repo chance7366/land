@@ -13,6 +13,7 @@ import { firstAddressFromDetail } from "@/lib/auction-list-details";
 import { formatAuctionMoney, formatDateYmd, parseImages } from "@/lib/format";
 import type { SerializedAuction } from "@/lib/auction-split-view";
 import { auctionAreaLabel } from "@/lib/auction-list-display";
+import { htmlWithInlinedStyles } from "@/lib/blog-clipboard-html";
 
 function SectionBar({ n, title }: { n: number; title: string }) {
   return (
@@ -27,10 +28,21 @@ function SectionBar({ n, title }: { n: number; title: string }) {
 
 type Props = {
   auction: SerializedAuction;
+  /** true면 「블로그용 복사」 표시 (관리자). 사용자 페이지는 false. */
+  allowBlogCopy?: boolean;
+  backHref?: string;
+  backLabel?: string;
 };
 
-export function AuctionDetailExport({ auction }: Props) {
+export function AuctionDetailExport({
+  auction,
+  allowBlogCopy = false,
+  backHref,
+  backLabel,
+}: Props) {
   const [copied, setCopied] = useState(false);
+  const resolvedBackHref = backHref ?? `/auctions/${auction.id}`;
+  const resolvedBackLabel = backLabel ?? "상세로 돌아가기";
   const sections = useMemo(() => buildAuctionDetailSections(auction), [auction]);
   const images = useMemo(() => parseImages(auction.images).slice(0, 3), [auction.images]);
   const minPrice = auction.minPrice ?? auction.recommendedPrice;
@@ -49,7 +61,7 @@ export function AuctionDetailExport({ auction }: Props) {
     const el = document.getElementById("export-article");
     if (!el) return;
     try {
-      const html = el.innerHTML;
+      const html = htmlWithInlinedStyles(el);
       const text = el.innerText;
       if (typeof ClipboardItem !== "undefined" && navigator.clipboard.write) {
         await navigator.clipboard.write([
@@ -80,21 +92,23 @@ export function AuctionDetailExport({ auction }: Props) {
     <div className="min-h-screen bg-[#D8D4CE] font-[family-name:var(--font-unifine),Pretendard,Noto_Sans_KR,sans-serif] text-[#2F2F2F] print:bg-white print:p-0">
       <div className="mx-auto flex max-w-[794px] flex-wrap items-center justify-between gap-3 px-4 py-4 print:hidden">
         <Link
-          href={`/auctions/${auction.id}`}
+          href={resolvedBackHref}
           className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#3D342C]/80 hover:text-[#3D342C]"
         >
           <ArrowLeft className="h-4 w-4" />
-          상세로 돌아가기
+          {resolvedBackLabel}
         </Link>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-[#6B5344]/25 bg-white px-4 py-2.5 text-sm font-bold text-[#3D342C] shadow-sm hover:bg-[#F7E8D8]"
-          >
-            {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
-            {copied ? "복사됨" : "블로그용 복사"}
-          </button>
+          {allowBlogCopy ? (
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#6B5344]/25 bg-white px-4 py-2.5 text-sm font-bold text-[#3D342C] shadow-sm hover:bg-[#F7E8D8]"
+            >
+              {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+              {copied ? "복사됨" : "블로그용 복사"}
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={handlePrint}

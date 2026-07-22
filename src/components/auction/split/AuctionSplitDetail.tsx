@@ -261,7 +261,7 @@ export function AuctionSplitDetail({ auction, onBack, showBack }: Props) {
               className="inline-flex items-center gap-1.5 rounded-xl border border-[#f5e6d3]/35 bg-[#6B5344]/40 px-4 py-2.5 text-sm font-bold text-[#f5e6d3] hover:bg-[#6B5344]/55"
             >
               <Printer className="h-4 w-4" />
-              블로그·인쇄
+              인쇄
             </Link>
             {generalReportUrl ? (
               <a

@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AuctionDetailExport } from "@/components/auction/AuctionDetailExport";
-import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 import { serializeAuction } from "@/lib/auction-split-view";
 import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
 import { isSupabaseEnabled } from "@/lib/supabase/config";
-import { getAuctionFromSupabase } from "@/lib/supabase/repos/catalog";
+import { listAllAuctionsAdminSupabase } from "@/lib/supabase/repos/admin-catalog";
 import type { Auction } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -17,10 +16,11 @@ type PageProps = {
 
 async function loadAuction(id: string): Promise<Auction | null> {
   return withDbFallback(
-    "auction-detail-export",
+    "admin-auction-export",
     async () => {
       if (isSupabaseEnabled()) {
-        return getAuctionFromSupabase(id) as Promise<Auction | null>;
+        const items = await listAllAuctionsAdminSupabase();
+        return (items.find((a) => a.id === id) as Auction | undefined) ?? null;
       }
       return prisma.auction.findUnique({ where: { id } });
     },
@@ -32,15 +32,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { id } = await params;
   const auction = await loadAuction(id);
   if (!auction) {
-    return { title: "경매물건 내보내기 | 찬스부동산 경매중개" };
+    return { title: "경매물건 내보내기 | 관리자" };
   }
   return {
-    title: `${auction.caseNumber} · 인쇄 | 찬스부동산 경매중개`,
-    description: `${auction.caseNumber} 인쇄용 안내`,
+    title: `${auction.caseNumber} · 블로그·인쇄 | 관리자`,
+    description: `${auction.caseNumber} 블로그·인쇄용 안내`,
   };
 }
 
-export default async function AuctionDetailExportPage({ params }: PageProps) {
+/** 관리자 전용 — 블로그용 복사 + 인쇄 (사이드바 없는 전체 화면) */
+export default async function AdminAuctionExportPage({ params }: PageProps) {
   const { id } = await params;
   const auction = await loadAuction(id);
   if (!auction) notFound();
@@ -48,9 +49,11 @@ export default async function AuctionDetailExportPage({ params }: PageProps) {
   const serialized = serializeAuction(auction);
 
   return (
-    <>
-      <AnalyticsPageView menuKey="auctions" />
-      <AuctionDetailExport auction={serialized} allowBlogCopy={false} />
-    </>
+    <AuctionDetailExport
+      auction={serialized}
+      allowBlogCopy
+      backHref={`/admin/auctions/${id}/edit`}
+      backLabel="수정 화면으로"
+    />
   );
 }
