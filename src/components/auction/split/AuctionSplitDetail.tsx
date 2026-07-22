@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useMemo } from "react";
-import { ArrowLeft, ExternalLink, Phone, MessageSquare } from "lucide-react";
+import { ArrowLeft, ExternalLink, Phone, MessageSquare, Printer } from "lucide-react";
 import { AppLink as Link } from "@/components/ui/AppLink";
 import { BasicPropertyInfoPanel } from "@/components/auction/BasicPropertyInfoPanel";
 import { ListDetailsPanel } from "@/components/auction/ListDetailsPanel";
@@ -256,6 +256,13 @@ export function AuctionSplitDetail({ auction, onBack, showBack }: Props) {
               <Phone className="h-4 w-4" />
               전화 연결 ({OFFICE_TEL})
             </a>
+            <Link
+              href={`/auctions/${auction.id}/export`}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#f5e6d3]/35 bg-[#6B5344]/40 px-4 py-2.5 text-sm font-bold text-[#f5e6d3] hover:bg-[#6B5344]/55"
+            >
+              <Printer className="h-4 w-4" />
+              블로그·인쇄
+            </Link>
             {generalReportUrl ? (
               <a
                 href={generalReportUrl}
