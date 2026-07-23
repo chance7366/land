@@ -5,12 +5,14 @@ import {
   AlertTriangle,
   CheckCircle2,
   ExternalLink,
+  FileText,
   Loader2,
   RefreshCw,
   XCircle,
 } from "lucide-react";
 import { AppLink as Link } from "@/components/ui/AppLink";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { navigateTo } from "@/lib/navigate";
 import {
   HEALTH_STATUS_META,
   evaluateSourceHealth,
@@ -36,6 +38,7 @@ export function AdminNewsFeedClient({ initialRows }: { initialRows: AdminNewsHea
   const [rows, setRows] = useState<AdminNewsHealthRow[]>(initialRows);
   const [collectingAll, setCollectingAll] = useState(false);
   const [collectingSource, setCollectingSource] = useState<NewsFeedSourceId | null>(null);
+  const [generatingReport, setGeneratingReport] = useState(false);
   const [message, setMessage] = useState("");
   const [, setTick] = useState(0);
 
@@ -105,6 +108,40 @@ export function AdminNewsFeedClient({ initialRows }: { initialRows: AdminNewsHea
     }
   }
 
+  async function generateTodayReport() {
+    setGeneratingReport(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/admin/news-feed/today-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        reportUrl?: string;
+        articleCount?: number;
+        empty?: boolean;
+      };
+      if (!res.ok) {
+        setMessage(data.error ?? "오늘의 뉴스 보고서 생성 실패");
+        return;
+      }
+      const hint =
+        data.empty || data.articleCount === 0
+          ? "당일 기사 없음 · 안내 보고서 열기"
+          : `보고서 생성 · ${data.articleCount ?? 0}건`;
+      setMessage(hint);
+      navigateTo(data.reportUrl ?? "/admin/news/today-report");
+    } catch {
+      setMessage("네트워크 오류 · 보고서 생성 실패");
+    } finally {
+      setGeneratingReport(false);
+    }
+  }
+
+  const busy = collectingAll || collectingSource != null || generatingReport;
+
   return (
     <main className="p-6 pb-16 font-[family-name:var(--font-unifine),Outfit,sans-serif] md:p-10">
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
@@ -118,7 +155,20 @@ export function AdminNewsFeedClient({ initialRows }: { initialRows: AdminNewsHea
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            disabled={collectingAll || collectingSource != null}
+            disabled={busy}
+            onClick={() => void generateTodayReport()}
+            className="inline-flex items-center gap-2 rounded-xl border border-[#f5e6d3]/35 bg-[#6B5344]/50 px-4 py-2.5 text-sm font-bold text-[#f5e6d3] hover:bg-[#6B5344]/70 disabled:opacity-50"
+          >
+            {generatingReport ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileText className="h-4 w-4" />
+            )}
+            {generatingReport ? "보고서 생성 중…" : "오늘의 뉴스 보고서"}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
             onClick={() => void collect()}
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#4dabff] to-[#913dff] px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-[#913dff]/20 disabled:opacity-50"
           >
@@ -159,7 +209,7 @@ export function AdminNewsFeedClient({ initialRows }: { initialRows: AdminNewsHea
         hint="사용자 사이드바 · 부동산소식 그룹"
         rows={estate}
         collectingSource={collectingSource}
-        busy={collectingAll}
+        busy={busy}
         onCollect={(source) => void collect([source])}
       />
 
@@ -168,7 +218,7 @@ export function AdminNewsFeedClient({ initialRows }: { initialRows: AdminNewsHea
         hint="사용자 사이드바 · 지역소식 그룹"
         rows={region}
         collectingSource={collectingSource}
-        busy={collectingAll}
+        busy={busy}
         onCollect={(source) => void collect([source])}
         className="mt-8"
       />

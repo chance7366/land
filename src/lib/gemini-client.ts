@@ -16,6 +16,11 @@ import {
 } from "@/lib/auction-report-models";
 import type { ReportMediaPart } from "@/lib/auction-report-media";
 import { buildUsageRecord, type GeminiUsageRecord } from "@/lib/gemini-usage-shared";
+import {
+  buildTodayNewsReportSystemPrompt,
+  buildTodayNewsReportUserPrompt,
+} from "@/lib/news-today-report";
+import type { TodayNewsArticle } from "@/lib/news-today";
 
 export {
   AUCTION_REPORT_MODELS,
@@ -340,3 +345,73 @@ export async function generateAuctionAnalysisMarkdown(
 
   throw friendlyGeminiError(lastErr, model);
 }
+
+export type TodayNewsReportResult = {
+  markdown: string;
+  usage: GeminiUsageRecord;
+};
+
+/** 오늘의 부동산소식 HTML 보고서용 마크다운 (제목 유지 · 요약만 생성) */
+export async function generateTodayNewsReportMarkdown(
+  dateKey: string,
+  articles: TodayNewsArticle[],
+  model: AuctionReportModelId = GEMINI_FLASH_MODEL,
+): Promise<TodayNewsReportResult> {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) {
+    throw new GeminiRequestError("GEMINI_API_KEY가 설정되어 있지 않습니다.", 503);
+  }
+
+  if (!isTextReportModel(model) || model === NANO_BANANA_PRO_MODEL) {
+    throw new GeminiRequestError(
+      "뉴스 요약은 Gemini Flash 또는 Pro 텍스트 모델을 사용하세요.",
+      400,
+    );
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+  const systemInstruction = buildTodayNewsReportSystemPrompt();
+  const userPrompt = buildTodayNewsReportUserPrompt(dateKey, articles);
+
+  const attempts =
+    model === GEMINI_FLASH_MODEL || model === GEMINI_FLASH_25_MODEL ? 2 : 1;
+  let lastErr: unknown;
+
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+        config: { systemInstruction },
+      });
+
+      const text = response.text?.trim();
+      if (!text) {
+        throw new GeminiRequestError("Gemini가 빈 응답을 반환했습니다.", 502);
+      }
+
+      const { inputTokens, outputTokens } = readUsageTokens(response);
+      const usage = buildUsageRecord({
+        model,
+        inputTokens,
+        outputTokens,
+        caseNumber: `news-${dateKey}`,
+      });
+
+      return { markdown: text, usage };
+    } catch (e) {
+      lastErr = e;
+      const { code, message = "" } = extractApiPayload(e);
+      const busy = code === 503 || /unavailable|high demand|overloaded/i.test(message);
+      if (busy && i < attempts - 1) {
+        await sleep(2500);
+        continue;
+      }
+      if (e instanceof GeminiRequestError) throw e;
+      throw friendlyGeminiError(e, model);
+    }
+  }
+
+  throw friendlyGeminiError(lastErr, model);
+}
+
