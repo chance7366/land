@@ -21,10 +21,12 @@ export async function launchAppBrowser(
       import("playwright-core"),
       import("@sparticuz/chromium"),
     ]);
-    const chromium = chromiumMod.default;
-    if (typeof chromium.setGraphicsMode === "function") {
-      chromium.setGraphicsMode(false);
-    }
+    const chromium = chromiumMod.default as {
+      args: string[];
+      executablePath: () => Promise<string>;
+      setGraphicsMode?: (enabled: boolean) => void;
+    };
+    chromium.setGraphicsMode?.(false);
     const executablePath = await chromium.executablePath();
     const execDir = path.dirname(executablePath);
     process.env.LD_LIBRARY_PATH = [execDir, process.env.LD_LIBRARY_PATH]
