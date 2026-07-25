@@ -2,7 +2,6 @@
 
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { navigateTo } from "@/lib/navigate";
 import { GlassCard } from "@/components/ui/GlassCard";
 
 function AdminLoginForm() {
@@ -19,8 +18,9 @@ function AdminLoginForm() {
 
     const res = await fetch("/api/auth/login", {
       method: "POST",
+      credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ password: password.trim() }),
     });
 
     if (!res.ok) {
@@ -30,7 +30,9 @@ function AdminLoginForm() {
       return;
     }
 
-    navigateTo(from.startsWith("/admin") ? from : "/admin");
+    // 쿠키 반영을 위해 soft navigation 대신 전체 이동
+    const target = from.startsWith("/admin") ? from : "/admin";
+    window.location.href = target;
   }
 
   return (

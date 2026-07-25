@@ -18,7 +18,11 @@ export function createSessionValue(userId: string): string {
 export function verifySessionValue(value: string): string | null {
   try {
     const decoded = Buffer.from(value, "base64url").toString("utf8");
-    const [userId, issuedAt, signature] = decoded.split(":");
+    const parts = decoded.split(":");
+    if (parts.length < 3) return null;
+    const signature = parts[parts.length - 1];
+    const issuedAt = parts[parts.length - 2];
+    const userId = parts.slice(0, -2).join(":");
     if (!userId || !issuedAt || !signature) return null;
 
     const expected = signPayload(`${userId}:${issuedAt}`);

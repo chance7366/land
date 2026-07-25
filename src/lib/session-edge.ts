@@ -27,7 +27,12 @@ async function signPayload(payload: string): Promise<string> {
 export async function verifySessionValueEdge(value: string): Promise<string | null> {
   try {
     const decoded = fromBase64Url(value);
-    const [userId, issuedAt, signature] = decoded.split(":");
+    const parts = decoded.split(":");
+    // userId:issuedAt:signature — userId에 ':'가 있어도 마지막 2칸을 기준으로 파싱
+    if (parts.length < 3) return null;
+    const signature = parts[parts.length - 1];
+    const issuedAt = parts[parts.length - 2];
+    const userId = parts.slice(0, -2).join(":");
     if (!userId || !issuedAt || !signature) return null;
 
     const expected = await signPayload(`${userId}:${issuedAt}`);
