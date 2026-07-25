@@ -2,7 +2,7 @@
 
 /**
  * 매물 등록 고도화 목업 — 5-Step 위저드 + 우측 법적 체크리스트
- * 운영 /admin/properties/new 미적용
+ * 운영 /admin/properties/new 적용 (대장 조회는 Step2)
  */
 
 import { useMemo, useState, type ReactNode } from "react";
@@ -70,7 +70,7 @@ export function PropertyRegisterComplianceSample() {
       <div className="border-b border-emerald-400/30 bg-[#0a1210] px-4 py-3 text-center text-xs text-emerald-100/90">
         <p className="font-bold text-emerald-50">매물 등록 고도화 목업 — 운영 적용됨</p>
         <p className="mt-1 text-[11px] text-emerald-100/70">
-          실제: /admin/properties/new · 5-Step · 7비목 · 법적 체크리스트
+          실제: /admin/properties/new · 5-Step · 대장조회(공공데이터·브이월드) · 7비목 · 법적 체크리스트
         </p>
         <p className="mt-1.5 flex flex-wrap justify-center gap-3 text-[11px]">
           <Link href="/mockup/property-detail-conversion" className="font-semibold text-[#c4b5fd] underline-offset-2 hover:underline">

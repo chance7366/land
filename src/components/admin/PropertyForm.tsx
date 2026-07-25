@@ -40,12 +40,14 @@ import {
   type FieldSpec,
   type FormStep,
 } from "@/lib/property-naver";
+import { PropertyLedgerLookupPanel } from "@/components/admin/PropertyLedgerLookupPanel";
+import type { BuildingLedgerFields, LandLedgerFields } from "@/lib/public-data/types";
 
 const MAX_IMAGES = 5;
 
 const STEP_LABELS = [
   { title: "기본정보", sub: "분류 · 거래" },
-  { title: "상세정보", sub: "면적 · 층 · 방향" },
+  { title: "상세정보", sub: "대장조회 · 면적" },
   { title: "가격/관리비", sub: "거래가 · 7비목" },
   { title: "시설·법적", sub: "옵션 · 위반 · 담당" },
   { title: "미디어", sub: "사진 · 소유자" },
@@ -339,6 +341,55 @@ export function PropertyForm({ initial }: PropertyFormProps) {
     setField("title", title);
   }
 
+  function applyBuildingLedger(fields: BuildingLedgerFields) {
+    setForm((prev) => {
+      const next = { ...prev };
+      const assign = (key: string, value: string | number | undefined) => {
+        if (value === undefined || value === "") return;
+        next[key] = value;
+      };
+      assign("buildingName", fields.buildingName);
+      assign("buildingUse", fields.buildingUse);
+      assign("totalFloorArea", fields.totalFloorArea);
+      assign("landShareArea", fields.landShareArea);
+      assign("totalFloors", fields.totalFloors);
+      assign("useApprovalDate", fields.useApprovalDate);
+      assign("approvalDate", fields.approvalDate);
+      assign("totalParking", fields.totalParking);
+      assign("structureType", fields.structureType);
+      // 집합건물은 전유면적이 표제부 연면적과 다를 수 있음 → 비어 있을 때만 채움
+      if (
+        (prev.exclusiveArea == null || prev.exclusiveArea === "") &&
+        fields.exclusiveArea != null
+      ) {
+        next.exclusiveArea = fields.exclusiveArea;
+      }
+      return next;
+    });
+  }
+
+  function applyLandLedger(fields: LandLedgerFields) {
+    setForm((prev) => {
+      const next = { ...prev };
+      const assign = (key: string, value: string | number | undefined) => {
+        if (value === undefined || value === "") return;
+        next[key] = value;
+      };
+      assign("exclusiveArea", fields.exclusiveArea);
+      assign("landCategory", fields.landCategory);
+      assign("zoning", fields.zoning);
+      assign("roadAccess", fields.roadAccess);
+      assign("terrain", fields.terrain);
+      assign("landShape", fields.landShape);
+      assign("landUseStatus", fields.landUseStatus);
+      if (fields.officialLandPrice != null) {
+        next.officialLandPrice = fields.officialLandPrice;
+      }
+      if (fields.pnu) next.pnu = fields.pnu;
+      return next;
+    });
+  }
+
   function handleReset() {
     setForm(propertyToFormState(initial));
     setImageInput("");
@@ -609,70 +660,87 @@ export function PropertyForm({ initial }: PropertyFormProps) {
 
           {wizardStep === 2 && (
             <Section n={2} title="매물 상세 · 면적">
-              <div className="grid gap-3 md:grid-cols-2">
-                {fieldsByStep[2].map((field) => (
-                  <DynamicField
-                    key={`2-${field.field_name}`}
-                    field={field}
-                    form={form}
-                    dealType={dealType}
-                    setField={setField}
-                    toggleMulti={toggleMulti}
-                  />
-                ))}
-                <Field label="실사용 가능 주차대수">
-                  <input
-                    type="number"
-                    className={inputClass}
-                    value={form.actualParking == null ? "" : String(form.actualParking)}
-                    onChange={(e) => setField("actualParking", e.target.value)}
-                  />
-                </Field>
-                <Field label="사용승인일">
-                  <input
-                    type="date"
-                    className={inputClass}
-                    value={String(form.useApprovalDate ?? "")}
-                    onChange={(e) => setField("useApprovalDate", e.target.value)}
-                  />
-                </Field>
-              </div>
-              <label
-                className={`mt-3 flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm ${
-                  isRetailLike
-                    ? "cursor-not-allowed border-white/10 text-white/30"
-                    : "border-white/15 text-slate-300"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  disabled={isRetailLike}
-                  checked={form.floorDisplayMode === "BAND"}
-                  onChange={(e) => {
-                    setField("floorDisplayMode", e.target.checked ? "BAND" : "NUMBER");
-                    if (!e.target.checked) setField("floorBand", "");
+              <div className="space-y-4">
+                <PropertyLedgerLookupPanel
+                  addressParts={{
+                    sido: String(form.sido || ""),
+                    sigungu: String(form.sigungu || ""),
+                    eupmyeondong: String(form.eupmyeondong || ""),
+                    ri: String(form.ri || ""),
+                    jibunMain: form.jibunMain as string | number | undefined,
+                    jibunSub: form.jibunSub as string | number | undefined,
                   }}
+                  onApplyBuilding={applyBuildingLedger}
+                  onApplyLand={applyLandLedger}
                 />
-                중개의뢰인 미희망 시 층수 저/중/고 표시
-                {isRetailLike ? (
-                  <span className="ml-auto text-[10px] text-rose-300/80">상가·비주거 불가</span>
-                ) : null}
-              </label>
-              {form.floorDisplayMode === "BAND" && !isRetailLike ? (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {(["LOW", "MID", "HIGH"] as const).map((b) => (
-                    <ChipButton
-                      key={b}
-                      active={form.floorBand === b}
-                      label={b === "LOW" ? "저" : b === "MID" ? "중" : "고"}
-                      onClick={() => setField("floorBand", b)}
+                <p className="text-[11px] text-slate-400">
+                  아래 항목은 API 적용 후에도 언제든 수기 수정할 수 있습니다.
+                </p>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {fieldsByStep[2].map((field) => (
+                    <DynamicField
+                      key={`2-${field.field_name}`}
+                      field={field}
+                      form={form}
+                      dealType={dealType}
+                      setField={setField}
+                      toggleMulti={toggleMulti}
                     />
                   ))}
+                  <Field label="실사용 가능 주차대수">
+                    <input
+                      type="number"
+                      className={inputClass}
+                      value={form.actualParking == null ? "" : String(form.actualParking)}
+                      onChange={(e) => setField("actualParking", e.target.value)}
+                    />
+                  </Field>
+                  <Field label="사용승인일">
+                    <input
+                      type="date"
+                      className={inputClass}
+                      value={String(form.useApprovalDate ?? "")}
+                      onChange={(e) => setField("useApprovalDate", e.target.value)}
+                    />
+                  </Field>
                 </div>
-              ) : null}
-              {fieldsByStep[2].length === 0 && (
-                <p className="text-sm text-slate-500">이 유형에 해당하는 상세 필드가 없습니다.</p>
-              )}
+                <label
+                  className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm ${
+                    isRetailLike
+                      ? "cursor-not-allowed border-white/10 text-white/30"
+                      : "border-white/15 text-slate-300"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    disabled={isRetailLike}
+                    checked={form.floorDisplayMode === "BAND"}
+                    onChange={(e) => {
+                      setField("floorDisplayMode", e.target.checked ? "BAND" : "NUMBER");
+                      if (!e.target.checked) setField("floorBand", "");
+                    }}
+                  />
+                  중개의뢰인 미희망 시 층수 저/중/고 표시
+                  {isRetailLike ? (
+                    <span className="ml-auto text-[10px] text-rose-300/80">상가·비주거 불가</span>
+                  ) : null}
+                </label>
+                {form.floorDisplayMode === "BAND" && !isRetailLike ? (
+                  <div className="flex flex-wrap gap-2">
+                    {(["LOW", "MID", "HIGH"] as const).map((b) => (
+                      <ChipButton
+                        key={b}
+                        active={form.floorBand === b}
+                        label={b === "LOW" ? "저" : b === "MID" ? "중" : "고"}
+                        onClick={() => setField("floorBand", b)}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+                {fieldsByStep[2].length === 0 && (
+                  <p className="text-sm text-slate-500">이 유형에 해당하는 상세 필드가 없습니다.</p>
+                )}
+              </div>
             </Section>
           )}
 

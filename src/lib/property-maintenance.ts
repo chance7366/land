@@ -31,6 +31,8 @@ export const COMPLIANCE_SPEC_KEYS = [
   "listingAgentName",
   "listingAgentPhone",
   "directionBasis",
+  "officialLandPrice",
+  "pnu",
 ] as const;
 
 export function parseMaintenanceMode(specs: Record<string, unknown>): MaintenanceMode {
