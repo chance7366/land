@@ -1019,6 +1019,21 @@ export function formatYmRangeDot(startYm: string, endYm: string): string {
   return `${formatYmDot(startYm)} ~ ${formatYmDot(endYm)}`;
 }
 
+/** 연월 칩용: 연도별 그룹 (연 라벨 + MM 칩) */
+export function groupYmByYear(
+  months: string[],
+): { year: string; items: { ym: string; mm: string }[] }[] {
+  const map = new Map<string, { ym: string; mm: string }[]>();
+  for (const ym of months) {
+    const [y, m] = ym.split("-");
+    if (!y || !m) continue;
+    const list = map.get(y) ?? [];
+    list.push({ ym, mm: m });
+    map.set(y, list);
+  }
+  return [...map.entries()].map(([year, items]) => ({ year, items }));
+}
+
 export function escapeCsvCell(v: string): string {
   if (/[",\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
   return v;

@@ -128,34 +128,36 @@ function YearMonthRange(props: {
   onEnd: (v: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 text-xs text-landing-muted">
-      <span>조회 기간</span>
-      <select
-        className={SELECT_CLS}
-        value={props.startYm}
-        onChange={(e) => props.onStart(e.target.value)}
-      >
-        {YM_OPTIONS.map((ym) => (
-          <option key={`s-${ym}`} value={ym}>
-            {ym.replace("-", "년 ")}월
-          </option>
-        ))}
-      </select>
-      <span>~</span>
-      <select
-        className={SELECT_CLS}
-        value={props.endYm}
-        onChange={(e) => props.onEnd(e.target.value)}
-      >
-        {YM_OPTIONS.map((ym) => (
-          <option key={`e-${ym}`} value={ym}>
-            {ym.replace("-", "년 ")}월
-          </option>
-        ))}
-      </select>
-      <span className="font-semibold text-[#a5b4fc]">
+    <div className="flex flex-col gap-1.5 text-xs text-landing-muted">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-medium text-landing-text">수집기간</span>
+        <select
+          className={SELECT_CLS}
+          value={props.startYm}
+          onChange={(e) => props.onStart(e.target.value)}
+        >
+          {YM_OPTIONS.map((ym) => (
+            <option key={`s-${ym}`} value={ym}>
+              {ym.replace("-", "년 ")}월
+            </option>
+          ))}
+        </select>
+        <span>~</span>
+        <select
+          className={SELECT_CLS}
+          value={props.endYm}
+          onChange={(e) => props.onEnd(e.target.value)}
+        >
+          {YM_OPTIONS.map((ym) => (
+            <option key={`e-${ym}`} value={ym}>
+              {ym.replace("-", "년 ")}월
+            </option>
+          ))}
+        </select>
+      </div>
+      <p className="font-semibold tracking-wide text-[#a5b4fc]">
         {formatYmRangeDot(props.startYm, props.endYm)}
-      </span>
+      </p>
     </div>
   );
 }
@@ -465,7 +467,7 @@ export function AdminTransactionsBrowseClient() {
         </label>
 
         <p className="text-[11px] text-[#a5b4fc]">
-          기간 {formatYmRangeDot(startYm, endYm)} · 컬럼{" "}
+          수집기간 {formatYmRangeDot(startYm, endYm)} · 컬럼{" "}
           {columns.map((c) => c.label).join(" · ")}
           {loading ? " · 불러오는 중…" : ""}
         </p>

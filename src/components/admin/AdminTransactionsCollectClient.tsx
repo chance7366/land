@@ -18,6 +18,7 @@ import {
   dealLabel,
   formatYmDot,
   formatYmRangeDot,
+  groupYmByYear,
   listYmBetween,
   propertyLabel,
   ymOptions,
@@ -93,34 +94,80 @@ function YearMonthRange(props: {
   onEnd: (v: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 text-xs text-landing-muted">
-      <span>수집 기간</span>
-      <select
-        className={SELECT_CLS}
-        value={props.startYm}
-        onChange={(e) => props.onStart(e.target.value)}
-      >
-        {YM_OPTIONS.map((ym) => (
-          <option key={`s-${ym}`} value={ym}>
-            {ym.replace("-", "년 ")}월
-          </option>
-        ))}
-      </select>
-      <span>~</span>
-      <select
-        className={SELECT_CLS}
-        value={props.endYm}
-        onChange={(e) => props.onEnd(e.target.value)}
-      >
-        {YM_OPTIONS.map((ym) => (
-          <option key={`e-${ym}`} value={ym}>
-            {ym.replace("-", "년 ")}월
-          </option>
-        ))}
-      </select>
-      <span className="font-semibold text-[#a5b4fc]">
+    <div className="flex flex-col gap-1.5 text-xs text-landing-muted">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-medium text-landing-text">수집기간</span>
+        <select
+          className={SELECT_CLS}
+          value={props.startYm}
+          onChange={(e) => props.onStart(e.target.value)}
+        >
+          {YM_OPTIONS.map((ym) => (
+            <option key={`s-${ym}`} value={ym}>
+              {ym.replace("-", "년 ")}월
+            </option>
+          ))}
+        </select>
+        <span>~</span>
+        <select
+          className={SELECT_CLS}
+          value={props.endYm}
+          onChange={(e) => props.onEnd(e.target.value)}
+        >
+          {YM_OPTIONS.map((ym) => (
+            <option key={`e-${ym}`} value={ym}>
+              {ym.replace("-", "년 ")}월
+            </option>
+          ))}
+        </select>
+      </div>
+      <p className="font-semibold tracking-wide text-[#a5b4fc]">
         {formatYmRangeDot(props.startYm, props.endYm)}
-      </span>
+      </p>
+    </div>
+  );
+}
+
+function MonthStatusChips(props: {
+  months: string[];
+  missingMonths: string[];
+  emptyMonths: string[];
+}) {
+  const groups = groupYmByYear(props.months);
+  return (
+    <div className="flex flex-col gap-1">
+      {groups.map((g) => (
+        <div key={g.year} className="flex flex-wrap items-center gap-1">
+          <span className="mr-0.5 w-9 shrink-0 text-[10px] font-semibold text-white/55">
+            {g.year}
+          </span>
+          {g.items.map(({ ym, mm }) => {
+            const miss = props.missingMonths.includes(ym);
+            const empty = props.emptyMonths.includes(ym);
+            return (
+              <span
+                key={ym}
+                title={
+                  miss
+                    ? `${formatYmDot(ym)} 미수집`
+                    : empty
+                      ? `${formatYmDot(ym)} 수집·0건`
+                      : `${formatYmDot(ym)} 수집됨`
+                }
+                className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                  miss
+                    ? "bg-rose-500/25 text-rose-100"
+                    : empty
+                      ? "bg-white/10 text-white/45"
+                      : "bg-emerald-500/20 text-emerald-100"
+                }`}
+              >
+                {mm}
+              </span>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }
@@ -589,9 +636,12 @@ export function AdminTransactionsCollectClient() {
       <GlassCard className="overflow-hidden p-0">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-4 py-3">
           <p className="text-sm font-bold text-landing-text">
-            수집 현황{" "}
-            <span className="font-normal text-landing-muted">
-              {formatYmRangeDot(startYm, endYm)}
+            수집 현황
+            <span className="ml-2 font-normal text-landing-muted">
+              수집기간{" "}
+              <span className="font-semibold text-[#a5b4fc]">
+                {formatYmRangeDot(startYm, endYm)}
+              </span>
               {loading ? " · 불러오는 중…" : ""}
             </span>
           </p>
@@ -656,33 +706,11 @@ export function AdminTransactionsCollectClient() {
                         </span>
                       </td>
                       <td className="px-3 py-2.5">
-                        <div className="flex flex-wrap gap-1">
-                          {months.map((ym) => {
-                            const miss = row.missingMonths.includes(ym);
-                            const empty = row.emptyMonths.includes(ym);
-                            return (
-                              <span
-                                key={ym}
-                                title={
-                                  miss
-                                    ? `${formatYmDot(ym)} 미수집`
-                                    : empty
-                                      ? `${formatYmDot(ym)} 수집·0건`
-                                      : `${formatYmDot(ym)} 수집됨`
-                                }
-                                className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                                  miss
-                                    ? "bg-rose-500/25 text-rose-100"
-                                    : empty
-                                      ? "bg-white/10 text-white/45"
-                                      : "bg-emerald-500/20 text-emerald-100"
-                                }`}
-                              >
-                                {formatYmDot(ym)}
-                              </span>
-                            );
-                          })}
-                        </div>
+                        <MonthStatusChips
+                          months={months}
+                          missingMonths={row.missingMonths}
+                          emptyMonths={row.emptyMonths}
+                        />
                       </td>
                       <td className="px-3 py-2.5">
                         {row.totalRows.toLocaleString()}

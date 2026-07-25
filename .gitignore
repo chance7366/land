@@ -80,3 +80,5 @@ temp/
 /*.docx
 /*.doc
 news-sidebar-check.yml
+
+.vercel
