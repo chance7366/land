@@ -5,6 +5,7 @@ const SEARCH_BASE = "https://www.law.go.kr/DRF/lawSearch.do";
 export function getLawOpenApiOc(): string | undefined {
   const oc =
     process.env.LAW_OPEN_API_OC?.trim() ||
+    process.env.LAW_OC?.trim() ||
     process.env.LAW_GO_KR_OC?.trim() ||
     process.env.LEGISLATION_API_KEY?.trim();
   return oc || undefined;
