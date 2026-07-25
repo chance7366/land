@@ -123,7 +123,7 @@ export function AdminSidebar({ authEnabled }: AdminSidebarProps) {
             </span>
           )}
         </div>
-        <nav className="flex-1 space-y-1 px-2">
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-2">
           {NAV.map((item) => {
             const active = isNavActive(pathname, item.href);
             const Icon = item.Icon;
