@@ -62,6 +62,14 @@ export async function listPropertiesFromSupabase(filters: PropertyListFilters = 
   return items;
 }
 
+export async function getPropertyFromSupabase(id: string) {
+  const sb = createSupabaseDataClient();
+  const { data, error } = await sb.from("properties").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return mapPropertyRow(data);
+}
+
 export async function getPropertyCategoryCountsFromSupabase() {
   const items = await listPropertiesFromSupabase({});
   const counts = {} as Record<PropertyCategory, number>;

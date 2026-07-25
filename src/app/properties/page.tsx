@@ -1,17 +1,16 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { LandingHeader } from "@/components/landing/LandingHeader";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingShell } from "@/components/landing/LandingShell";
 import { UserBottomNav } from "@/components/user/UserShell";
 import { PropertyFiltersDropdownConnected } from "@/components/property/PropertyFiltersDropdownConnected";
-import {
-  PropertySplitBoard,
-  type SerializedProperty,
-} from "@/components/property/split/PropertySplitBoard";
+import { PropertyListBoard } from "@/components/property/PropertyListBoard";
 import { getProperties, getPropertyCategoryCounts } from "@/lib/property-service";
 import { parsePropertyListFilters } from "@/lib/property-fields";
+import { serializeProperty } from "@/lib/property-split-view";
 import { withDbFallback } from "@/lib/db-fallback";
 import { prisma } from "@/lib/prisma";
 import { isSupabaseEnabled } from "@/lib/supabase/config";
@@ -25,7 +24,7 @@ import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 
 export const metadata: Metadata = {
   title: "부동산 중개 | 찬스부동산 경매중개",
-  description: "내포·홍성 중심 추천 매물 — 목록과 상세를 한 화면에서 확인하세요.",
+  description: "내포·홍성 중심 추천 매물 목록을 확인하세요.",
 };
 
 export const dynamic = "force-dynamic";
@@ -34,25 +33,18 @@ type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-function serializeProperty(
-  p: Awaited<ReturnType<typeof getProperties>>[number],
-): SerializedProperty {
-  return {
-    ...p,
-    publishedAt: p.publishedAt.toISOString(),
-    createdAt: p.createdAt.toISOString(),
-    updatedAt: p.updatedAt.toISOString(),
-  };
-}
-
 export default async function PropertiesPage({ searchParams }: PageProps) {
   const params = await searchParams;
+  const openId = typeof params.id === "string" ? params.id : null;
+  if (openId) {
+    redirect(`/properties/${openId}`);
+  }
+
   const urlParams = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (typeof value === "string") urlParams.set(key, value);
   });
 
-  const openId = typeof params.id === "string" ? params.id : null;
   const filters = parsePropertyListFilters(urlParams);
   const { items, counts, regions } = await withDbFallback(
     "properties-page",
@@ -93,10 +85,12 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
       regions: [] as string[],
     },
   );
-  const totalCount = Object.values(counts).reduce((sum, n) => sum + n, 0);
-  const filtered = Boolean(
-    filters.categories?.length || filters.deals?.length || filters.regions?.length,
-  );
+
+  const serialized = items.map(serializeProperty);
+  const recommended = serialized.filter((p) => p.featured).slice(0, 12);
+  const recommendStrip =
+    recommended.length > 0 ? recommended : serialized.slice(0, 8);
+  const totalCount = Object.values(counts).reduce((sum, n) => sum + n, 0) || serialized.length;
 
   return (
     <LandingShell>
@@ -114,12 +108,19 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
               <PropertyFiltersDropdownConnected regions={regions} />
             </Suspense>
           </div>
-          <PropertySplitBoard
-            items={items.map(serializeProperty)}
-            initialId={openId}
-            totalCount={totalCount}
-            filtered={filtered}
-          />
+          <Suspense
+            fallback={
+              <div className="flex min-h-[40vh] items-center justify-center text-sm text-white/50">
+                불러오는 중…
+              </div>
+            }
+          >
+            <PropertyListBoard
+              items={serialized}
+              recommended={recommendStrip}
+              totalCount={totalCount}
+            />
+          </Suspense>
         </div>
       </div>
       <LandingFooter />
