@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
-import type { Page } from "playwright";
+import type { Page } from "playwright-core";
 import { getUploadDir, uploadUrlPrefix } from "@/lib/uploads";
 import { isSupabaseEnabled } from "@/lib/supabase/config";
 import { uploadPropertyImage } from "@/lib/supabase/storage";

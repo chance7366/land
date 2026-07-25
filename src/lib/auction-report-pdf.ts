@@ -1,10 +1,10 @@
-import { chromium } from "playwright";
 import { marked } from "marked";
 import {
   enhanceReportHtml,
   inlineReportTableStyles,
   REPORT_PDF_CSS,
 } from "@/lib/auction-report-design";
+import { launchAppBrowser } from "@/lib/browser-launch";
 
 function escapeHtml(s: string): string {
   return s
@@ -80,10 +80,7 @@ export async function markdownToPdfBuffer(
 ): Promise<Buffer> {
   const { documentHtml } = await markdownToReportHtml(markdown, title);
 
-  const browser = await chromium.launch({
-    headless: true,
-    args: ["--disable-dev-shm-usage"],
-  });
+  const browser = await launchAppBrowser();
   try {
     const page = await browser.newPage();
     await page.setContent(documentHtml, { waitUntil: "networkidle" });

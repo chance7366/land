@@ -1,4 +1,5 @@
-import { chromium, type Browser, type Page } from "playwright";
+import type { Browser, Page } from "playwright-core";
+import { launchAppBrowser } from "@/lib/browser-launch";
 import type {
   CourtAuctionFixture,
   FormGroup,
@@ -240,7 +241,7 @@ async function collectStatusReport(
   court: string,
 ): Promise<StatusReport | null> {
   let captured: StatusReport | null = null;
-  const onResponse = async (res: import("playwright").Response) => {
+  const onResponse = async (res: import("playwright-core").Response) => {
     if (!/selectCurstExmndc\.on/i.test(res.url())) return;
     try {
       const json = await res.json();
@@ -861,10 +862,7 @@ export async function fetchCourtAuctionLive(input: LiveFetchInput): Promise<Live
 
   let browser: Browser | null = null;
   try {
-    browser = await chromium.launch({
-      headless: true,
-      args: ["--disable-dev-shm-usage", "--no-sandbox"],
-    });
+    browser = await launchAppBrowser();
     const page = await browser.newPage();
 
     const latestPoints: { current: AppraisalPoint[] | null } = { current: null };
@@ -1149,10 +1147,11 @@ export async function fetchCourtAuctionLive(input: LiveFetchInput): Promise<Live
     return { ok: true, items: fixtures, source: "live" };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (/Executable doesn't exist|browserType\.launch/i.test(msg)) {
+    if (/Executable doesn't exist|browserType\.launch|libnspr4|Failed to launch/i.test(msg)) {
       return {
         ok: false,
-        error: "Playwright Chromium이 설치되어 있지 않습니다. 서버에서 `npx playwright install chromium`을 실행해 주세요.",
+        error:
+          "브라우저 실행에 실패했습니다. 프로덕션은 @sparticuz/chromium 기반으로 동작합니다. 배포·함수 로그를 확인해 주세요.",
       };
     }
     return { ok: false, error: `법원 조회 중 오류: ${msg}` };

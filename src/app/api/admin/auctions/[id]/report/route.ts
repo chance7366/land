@@ -236,8 +236,10 @@ export async function POST(request: NextRequest, { params }: Params) {
   } catch (e) {
     console.error("[auctions/report] pdf", e);
     const msg = e instanceof Error ? e.message : "PDF 변환에 실패했습니다.";
-    const hint = /Executable doesn't exist|browserType\.launch/i.test(msg)
-      ? " Playwright Chromium이 필요합니다. `npx playwright install chromium`을 실행하세요."
+    const hint = /Executable doesn't exist|browserType\.launch|libnspr4|Failed to launch/i.test(
+      msg,
+    )
+      ? " 프로덕션 Chromium(@sparticuz/chromium) 실행에 실패했습니다. 배포 로그를 확인하세요."
       : "";
     return NextResponse.json({ error: `PDF 변환 실패: ${msg}.${hint}` }, { status: 500 });
   }
