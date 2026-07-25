@@ -13,7 +13,6 @@ import { DataTable } from "@/components/ui/DataTable";
 import {
   TX_DEAL_TYPES,
   TX_PROPERTY_TABS,
-  TX_REGION_TREE,
   buildSpreadsheetMl,
   escapeCsvCell,
   formatKrwMan,
@@ -26,6 +25,12 @@ import {
   type TxDealType,
   type TxPropertyType,
 } from "@/lib/mockup/transactions-sample";
+import {
+  LAWD_CODES_STATIC,
+  listSidos,
+  listSigunguForSido,
+  resolveLawdCdsFromRows,
+} from "@/lib/public-data/rtms/lawd-codes";
 
 const YM_OPTIONS = ymOptions();
 const SELECT_CLS =
@@ -60,14 +65,15 @@ function RegionCascade(props: {
   sido: string;
   sigungu: string;
   eupmyeondong: string;
+  emdOptions: string[];
   onSido: (v: string) => void;
   onSigungu: (v: string) => void;
   onEmd: (v: string) => void;
 }) {
-  const sidoNode = TX_REGION_TREE.find((s) => s.code === props.sido);
-  const sggList = sidoNode?.children ?? [];
-  const sggNode = sggList.find((s) => s.code === props.sigungu);
-  const emdList = sggNode?.children ?? [];
+  const sidos = listSidos(LAWD_CODES_STATIC);
+  const sggList = props.sido
+    ? listSigunguForSido(LAWD_CODES_STATIC, props.sido)
+    : [];
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -82,9 +88,9 @@ function RegionCascade(props: {
         }}
       >
         <option value="">시/도 전체(전국)</option>
-        {TX_REGION_TREE.map((s) => (
-          <option key={s.code} value={s.code}>
-            {s.name}
+        {sidos.map((name) => (
+          <option key={name} value={name}>
+            {name}
           </option>
         ))}
       </select>
@@ -97,10 +103,10 @@ function RegionCascade(props: {
           props.onEmd("");
         }}
       >
-        <option value="">시군구 전체</option>
+        <option value="">시군구 전체 ({sggList.length})</option>
         {sggList.map((s) => (
-          <option key={s.code} value={s.code}>
-            {s.name}
+          <option key={s.lawd_cd} value={s.lawd_cd}>
+            {s.sigungu}
           </option>
         ))}
       </select>
@@ -109,11 +115,12 @@ function RegionCascade(props: {
         value={props.eupmyeondong}
         disabled={!props.sigungu}
         onChange={(e) => props.onEmd(e.target.value)}
+        title="공공데이터 API는 읍면동 필터가 없어, 조회 결과의 읍면동명으로만 좁힙니다."
       >
-        <option value="">읍면동 전체</option>
-        {emdList.map((s) => (
-          <option key={s.code} value={s.code}>
-            {s.name}
+        <option value="">읍면동 전체 (조회결과 기준)</option>
+        {props.emdOptions.map((name) => (
+          <option key={name} value={name}>
+            {name}
           </option>
         ))}
       </select>
@@ -163,12 +170,8 @@ function YearMonthRange(props: {
 }
 
 function resolveLawdCds(sido: string, sigungu: string): string[] {
-  if (sigungu) return [sigungu];
-  if (sido) {
-    const node = TX_REGION_TREE.find((s) => s.code === sido);
-    return (node?.children ?? []).map((c) => c.code);
-  }
-  return [];
+  if (!sido && !sigungu) return [];
+  return resolveLawdCdsFromRows(LAWD_CODES_STATIC, sido, sigungu);
 }
 
 function mapApiRow(r: ApiTxRow): SampleTransaction {
@@ -228,7 +231,7 @@ export function AdminTransactionsBrowseClient() {
   const [dealType, setDealType] = useState<TxDealType>("SALE");
   const [startYm, setStartYm] = useState("2026-01");
   const [endYm, setEndYm] = useState("2026-06");
-  const [sido, setSido] = useState("44");
+  const [sido, setSido] = useState("충청남도");
   const [sigungu, setSigungu] = useState("44800");
   const [eupmyeondong, setEupmyeondong] = useState("");
   const [q, setQ] = useState("");
@@ -249,19 +252,17 @@ export function AdminTransactionsBrowseClient() {
     [propertyType, dealType],
   );
 
-  const emdName = useMemo(() => {
-    if (!eupmyeondong) return "";
-    return (
-      TX_REGION_TREE.find((s) => s.code === sido)
-        ?.children?.find((c) => c.code === sigungu)
-        ?.children?.find((c) => c.code === eupmyeondong)?.name ?? ""
+  const emdOptions = useMemo(() => {
+    const set = new Set(
+      rows.map((r) => r.eupmyeondong).filter((v): v is string => Boolean(v)),
     );
-  }, [sido, sigungu, eupmyeondong]);
+    return [...set].sort((a, b) => a.localeCompare(b, "ko"));
+  }, [rows]);
 
   const filtered = useMemo(() => {
-    if (!emdName) return rows;
-    return rows.filter((r) => r.eupmyeondong === emdName);
-  }, [rows, emdName]);
+    if (!eupmyeondong) return rows;
+    return rows.filter((r) => r.eupmyeondong === eupmyeondong);
+  }, [rows, eupmyeondong]);
 
   const activeRows = filtered.filter((r) => !r.cancelled);
 
@@ -448,6 +449,7 @@ export function AdminTransactionsBrowseClient() {
           sido={sido}
           sigungu={sigungu}
           eupmyeondong={eupmyeondong}
+          emdOptions={emdOptions}
           onSido={setSido}
           onSigungu={setSigungu}
           onEmd={setEupmyeondong}

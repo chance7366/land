@@ -13,7 +13,6 @@ import { DataTable } from "@/components/ui/DataTable";
 import {
   TX_DEAL_TYPES,
   TX_PROPERTY_TABS,
-  TX_REGION_TREE,
   buildCoverageSummary,
   dealLabel,
   formatYmDot,
@@ -26,12 +25,17 @@ import {
   type TxDealType,
   type TxPropertyType,
 } from "@/lib/mockup/transactions-sample";
+import {
+  LAWD_CODES_STATIC,
+  listSidos,
+  listSigunguForSido,
+  resolveLawdCdsFromRows,
+  type LawdCodeRow,
+} from "@/lib/public-data/rtms/lawd-codes";
 
 const YM_OPTIONS = ymOptions();
 const SELECT_CLS =
   "rounded-lg border border-white/10 bg-black/30 px-2.5 py-2 text-xs text-landing-text outline-none focus:border-blue-400/40";
-
-type LawdCodeRow = { lawd_cd: string; sido: string; sigungu: string };
 
 type CoverageApiRow = {
   lawd_cd: string;
@@ -47,11 +51,14 @@ type CoverageApiRow = {
 function RegionCascade(props: {
   sido: string;
   sigungu: string;
+  lawdCodes: LawdCodeRow[];
   onSido: (v: string) => void;
   onSigungu: (v: string) => void;
 }) {
-  const sidoNode = TX_REGION_TREE.find((s) => s.code === props.sido);
-  const sggList = sidoNode?.children ?? [];
+  const sidos = listSidos(props.lawdCodes);
+  const sggList = props.sido
+    ? listSigunguForSido(props.lawdCodes, props.sido)
+    : [];
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -64,9 +71,9 @@ function RegionCascade(props: {
         }}
       >
         <option value="">시/도 전체(전국)</option>
-        {TX_REGION_TREE.map((s) => (
-          <option key={s.code} value={s.code}>
-            {s.name}
+        {sidos.map((name) => (
+          <option key={name} value={name}>
+            {name}
           </option>
         ))}
       </select>
@@ -76,10 +83,10 @@ function RegionCascade(props: {
         disabled={!props.sido}
         onChange={(e) => props.onSigungu(e.target.value)}
       >
-        <option value="">시군구 전체</option>
+        <option value="">시군구 전체 ({sggList.length})</option>
         {sggList.map((s) => (
-          <option key={s.code} value={s.code}>
-            {s.name}
+          <option key={s.lawd_cd} value={s.lawd_cd}>
+            {s.sigungu}
           </option>
         ))}
       </select>
@@ -189,30 +196,10 @@ function mapCoverage(rows: CoverageApiRow[]): CoverageCell[] {
   }));
 }
 
-function resolveLawdCds(
-  sido: string,
-  sigungu: string,
-  allLawd: LawdCodeRow[],
-): string[] {
-  if (sigungu) return [sigungu];
-  if (sido) {
-    const node = TX_REGION_TREE.find((s) => s.code === sido);
-    const fromTree = (node?.children ?? []).map((c) => c.code);
-    if (fromTree.length) return fromTree;
-    return allLawd
-      .filter((l) => {
-        const sidoName = TX_REGION_TREE.find((s) => s.code === sido)?.name;
-        return sidoName ? l.sido === sidoName : false;
-      })
-      .map((l) => l.lawd_cd);
-  }
-  return allLawd.map((l) => l.lawd_cd);
-}
-
 export function AdminTransactionsCollectClient() {
   const [startYm, setStartYm] = useState("2026-01");
   const [endYm, setEndYm] = useState("2026-06");
-  const [sido, setSido] = useState("44");
+  const [sido, setSido] = useState("충청남도");
   const [sigungu, setSigungu] = useState("44800");
   const [collectTypes, setCollectTypes] = useState<TxPropertyType[]>(["APT"]);
   const [collectDeals, setCollectDeals] = useState<TxDealType[]>(["SALE", "RENT"]);
@@ -222,7 +209,7 @@ export function AdminTransactionsCollectClient() {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   const [coverage, setCoverage] = useState<CoverageCell[]>([]);
-  const [lawdCodes, setLawdCodes] = useState<LawdCodeRow[]>([]);
+  const [lawdCodes, setLawdCodes] = useState<LawdCodeRow[]>(LAWD_CODES_STATIC);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [syncing, setSyncing] = useState(false);
@@ -232,7 +219,7 @@ export function AdminTransactionsCollectClient() {
   const [settingsMsg, setSettingsMsg] = useState("");
 
   const targetLawdCds = useMemo(
-    () => resolveLawdCds(sido, sigungu, lawdCodes),
+    () => resolveLawdCdsFromRows(lawdCodes, sido, sigungu),
     [sido, sigungu, lawdCodes],
   );
 
@@ -261,29 +248,21 @@ export function AdminTransactionsCollectClient() {
 
   const regionLabel = useMemo(() => {
     if (sigungu) {
-      const s = TX_REGION_TREE.find((x) => x.code === sido);
-      const g = s?.children?.find((c) => c.code === sigungu);
-      return g ? `${s?.name ?? ""} ${g.name}`.trim() : sigungu;
+      const g = lawdCodes.find((x) => x.lawd_cd === sigungu);
+      return g ? `${g.sido} ${g.sigungu}` : sigungu;
     }
-    if (sido) {
-      return TX_REGION_TREE.find((x) => x.code === sido)?.name ?? sido;
-    }
+    if (sido) return sido;
     return "전국";
-  }, [sido, sigungu]);
+  }, [sido, sigungu, lawdCodes]);
 
   const loadCoverage = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const params = new URLSearchParams({ startYm, endYm });
-      // 요청용 lawd: 트리 기준. 전국(시/도 미선택)은 파라미터 생략 → API가 lawdCodes 전체 반환
-      if (sigungu) {
-        params.set("lawdCds", sigungu);
-      } else if (sido) {
-        const cds = (TX_REGION_TREE.find((s) => s.code === sido)?.children ?? []).map(
-          (c) => c.code,
-        );
-        if (cds.length) params.set("lawdCds", cds.join(","));
+      const cds = resolveLawdCdsFromRows(LAWD_CODES_STATIC, sido, sigungu);
+      if (cds.length && cds.length < LAWD_CODES_STATIC.length) {
+        params.set("lawdCds", cds.join(","));
       }
       if (collectTypes.length) params.set("propertyTypes", collectTypes.join(","));
       if (collectDeals.length) params.set("dealTypes", collectDeals.join(","));
@@ -301,6 +280,8 @@ export function AdminTransactionsCollectClient() {
       if (Array.isArray(data.lawdCodes)) {
         const next = data.lawdCodes as LawdCodeRow[];
         setLawdCodes((prev) => {
+          // DB가 아직 샘플만 있으면 정적 전국 목록 유지
+          if (next.length < 100) return prev.length >= 100 ? prev : LAWD_CODES_STATIC;
           if (
             prev.length === next.length &&
             prev.every((p, i) => p.lawd_cd === next[i]?.lawd_cd)
@@ -373,7 +354,7 @@ export function AdminTransactionsCollectClient() {
   async function runSync(forceAll = false) {
     const types = collectTypes.length ? collectTypes : (["APT"] as TxPropertyType[]);
     const deals = collectDeals.length ? collectDeals : (["SALE"] as TxDealType[]);
-    const lawds = resolveLawdCds(sido, sigungu, lawdCodes);
+    const lawds = resolveLawdCdsFromRows(lawdCodes, sido, sigungu);
     if (!lawds.length) {
       setSyncNote("수집할 시군구(lawdCd)가 없습니다. 지역을 선택하거나 lawd_codes를 확인하세요.");
       return;
@@ -496,12 +477,14 @@ export function AdminTransactionsCollectClient() {
         <RegionCascade
           sido={sido}
           sigungu={sigungu}
+          lawdCodes={lawdCodes}
           onSido={setSido}
           onSigungu={setSigungu}
         />
         <p className="text-[11px] text-white/40">
-          시군구 단위(5자리 lawdCd)로 수집합니다. 시/도만 선택하면 하위 시군구 전체,
-          미선택 시 lawd_codes 전체를 대상으로 합니다.
+          시군구 단위(5자리 lawdCd)로 수집합니다. 시/도 선택 시 해당 시도의 전체
+          시군구({sido ? listSigunguForSido(lawdCodes, sido).length : lawdCodes.length}
+          개)가 대상입니다. 공공데이터 API는 읍면동 단위 조회를 지원하지 않습니다.
         </p>
 
         <div>
@@ -544,14 +527,20 @@ export function AdminTransactionsCollectClient() {
           </div>
         </div>
 
-        <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-200">
+        <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-200">
           <input
             type="checkbox"
             checked={gapOnly}
             onChange={(e) => setGapOnly(e.target.checked)}
-            className="rounded border-white/20"
+            className="mt-0.5 rounded border-white/20"
           />
-          미수집 기간만 수집 (권장 · 이미 수집된 연월 건너뜀)
+          <span>
+            미수집 기간만 수집 (권장)
+            <span className="mt-0.5 block text-[11px] font-normal text-white/45">
+              켜면 이미 수집·0건 처리된 연월은 건너뜁니다. 끄거나 「강제 전체
+              재수집」을 쓰면 API를 다시 받아와 동일 건은 upsert로 갱신합니다.
+            </span>
+          </span>
         </label>
 
         <div className="rounded-xl border border-white/10 bg-black/25 p-3">
