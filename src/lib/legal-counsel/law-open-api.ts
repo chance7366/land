@@ -95,74 +95,74 @@ function parseLawList(json: unknown): LegalCounselSource[] {
   const root = json as Record<string, unknown>;
   const block = (root.LawSearch ?? root.lawSearch ?? root) as Record<string, unknown>;
   const items = asArray<Record<string, unknown>>(block.law ?? block.Law ?? block);
-  return items
-    .map((item) => {
-      const title = pickString(item, [
-        "법령명한글",
-        "법령명",
-        "법명",
-        "lawNm",
-        "법령명_한글",
-      ]);
-      const id = pickString(item, ["법령일련번호", "법령ID", "id", "MST"]);
-      const date = pickString(item, ["공포일자", "시행일자", "ancYd", "efYd"]);
-      const summary = pickString(item, ["법령약칭명", "소관부처명", "법령종류"]);
-      if (!title) return null;
-      return {
-        kind: "법령" as const,
-        title,
-        ref: [id && `ID ${id}`, date].filter(Boolean).join(" · ") || "현행법령",
-        summary: summary || undefined,
-        link: id
-          ? `https://www.law.go.kr/DRF/lawService.do?OC=view&target=law&ID=${encodeURIComponent(id)}&type=HTML`
-          : undefined,
-      };
-    })
-    .filter((x): x is LegalCounselSource => Boolean(x))
-    .slice(0, 5);
+  const out: LegalCounselSource[] = [];
+  for (const item of items) {
+    const title = pickString(item, [
+      "법령명한글",
+      "법령명",
+      "법명",
+      "lawNm",
+      "법령명_한글",
+    ]);
+    if (!title) continue;
+    const id = pickString(item, ["법령일련번호", "법령ID", "id", "MST"]);
+    const date = pickString(item, ["공포일자", "시행일자", "ancYd", "efYd"]);
+    const summary = pickString(item, ["법령약칭명", "소관부처명", "법령종류"]);
+    out.push({
+      kind: "법령",
+      title,
+      ref: [id && `ID ${id}`, date].filter(Boolean).join(" · ") || "현행법령",
+      summary: summary || undefined,
+      link: id
+        ? `https://www.law.go.kr/DRF/lawService.do?OC=view&target=law&ID=${encodeURIComponent(id)}&type=HTML`
+        : undefined,
+    });
+    if (out.length >= 5) break;
+  }
+  return out;
 }
 
 function parsePrecList(json: unknown): LegalCounselSource[] {
   const root = json as Record<string, unknown>;
   const block = (root.PrecSearch ?? root.precSearch ?? root) as Record<string, unknown>;
   const items = asArray<Record<string, unknown>>(block.prec ?? block.Prec ?? block);
-  return items
-    .map((item) => {
-      const title = pickString(item, ["사건명", "판례명", "사건번호", "title"]);
-      const caseNo = pickString(item, ["사건번호", "판례정보일련번호", "id"]);
-      const court = pickString(item, ["법원명", "선고일자", "판결일자"]);
-      const summary = pickString(item, ["판시사항", "판결요지", "요약"]);
-      if (!title && !caseNo) return null;
-      return {
-        kind: "판례" as const,
-        title: title || caseNo,
-        ref: [caseNo !== title ? caseNo : "", court].filter(Boolean).join(" · ") || "판례",
-        summary: summary ? stripHtml(summary).slice(0, 280) : undefined,
-      };
-    })
-    .filter((x): x is LegalCounselSource => Boolean(x))
-    .slice(0, 3);
+  const out: LegalCounselSource[] = [];
+  for (const item of items) {
+    const title = pickString(item, ["사건명", "판례명", "사건번호", "title"]);
+    const caseNo = pickString(item, ["사건번호", "판례정보일련번호", "id"]);
+    if (!title && !caseNo) continue;
+    const court = pickString(item, ["법원명", "선고일자", "판결일자"]);
+    const summary = pickString(item, ["판시사항", "판결요지", "요약"]);
+    out.push({
+      kind: "판례",
+      title: title || caseNo,
+      ref: [caseNo !== title ? caseNo : "", court].filter(Boolean).join(" · ") || "판례",
+      summary: summary ? stripHtml(summary).slice(0, 280) : undefined,
+    });
+    if (out.length >= 3) break;
+  }
+  return out;
 }
 
 function parseExpcList(json: unknown): LegalCounselSource[] {
   const root = json as Record<string, unknown>;
   const block = (root.ExpcSearch ?? root.expcSearch ?? root) as Record<string, unknown>;
   const items = asArray<Record<string, unknown>>(block.expc ?? block.Expc ?? block);
-  return items
-    .map((item) => {
-      const title = pickString(item, ["안건명", "해석례명", "제목", "title"]);
-      const id = pickString(item, ["안건번호", "해석례일련번호", "id"]);
-      const summary = pickString(item, ["질의요지", "회답", "요약"]);
-      if (!title && !id) return null;
-      return {
-        kind: "해석례" as const,
-        title: title || id,
-        ref: id || "법령해석례",
-        summary: summary ? stripHtml(summary).slice(0, 280) : undefined,
-      };
-    })
-    .filter((x): x is LegalCounselSource => Boolean(x))
-    .slice(0, 2);
+  const out: LegalCounselSource[] = [];
+  for (const item of items) {
+    const title = pickString(item, ["안건명", "해석례명", "제목", "title"]);
+    const id = pickString(item, ["안건번호", "해석례일련번호", "id"]);
+    if (!title && !id) continue;
+    const summary = pickString(item, ["질의요지", "회답", "요약"]);
+    out.push({
+      kind: "해석례",
+      title: title || id,
+      ref: id || "법령해석례",
+      summary: summary ? stripHtml(summary).slice(0, 280) : undefined,
+    });
+    if (out.length >= 2) break;
+  }
+  return out;
 }
 
 async function searchTarget(
