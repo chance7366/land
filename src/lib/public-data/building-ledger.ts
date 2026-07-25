@@ -103,35 +103,54 @@ export async function fetchBuildingLedger(
   });
 
   let json: unknown;
-  try {
-    const res = await fetch(`${TITLE_URL}?serviceKey=${key}&${params.toString()}`, {
-      cache: "no-store",
-      headers: { Accept: "application/json" },
-    });
-    const text = await res.text();
+  const url = `${TITLE_URL}?serviceKey=${key}&${params.toString()}`;
+  // 공공데이터 게이트웨이가 간헐적으로 plain-text 500을 돌려 2회까지 재시도
+  let lastParseError: LedgerLookupError | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      json = JSON.parse(text);
-    } catch {
-      return {
-        ok: false,
-        code: "PARSE",
-        error:
-          "건축물대장 API 응답이 JSON이 아닙니다. 서비스키·활용신청(건축HUB 건축물대장)을 확인하세요.",
-      };
-    }
-    if (!res.ok) {
-      return {
+      const res = await fetch(url, {
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      });
+      const text = await res.text();
+      try {
+        json = JSON.parse(text);
+        lastParseError = null;
+        break;
+      } catch {
+        lastParseError = {
+          ok: false,
+          code: "PARSE",
+          error:
+            text.trim().startsWith("Error") || res.status >= 500
+              ? `건축물대장 서버 일시 오류(HTTP ${res.status}). 잠시 후 다시 시도하세요.`
+              : "건축물대장 API 응답이 JSON이 아닙니다. 서비스키·활용신청(건축HUB 건축물대장)을 확인하세요.",
+        };
+        if (attempt < 2) {
+          await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+          continue;
+        }
+      }
+    } catch (err) {
+      lastParseError = {
         ok: false,
         code: "UPSTREAM",
-        error: `건축물대장 API HTTP ${res.status}`,
+        error: err instanceof Error ? err.message : "건축물대장 API 호출 실패",
       };
+      if (attempt < 2) {
+        await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+        continue;
+      }
     }
-  } catch (err) {
-    return {
-      ok: false,
-      code: "UPSTREAM",
-      error: err instanceof Error ? err.message : "건축물대장 API 호출 실패",
-    };
+  }
+  if (lastParseError || json == null) {
+    return (
+      lastParseError ?? {
+        ok: false,
+        code: "UPSTREAM",
+        error: "건축물대장 API 호출 실패",
+      }
+    );
   }
 
   const response = (json as { response?: { header?: { resultCode?: string; resultMsg?: string }; body?: unknown } })

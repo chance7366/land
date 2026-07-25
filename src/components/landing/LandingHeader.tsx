@@ -32,10 +32,10 @@ export function LandingHeader() {
     <header className="sticky top-0 z-50 border-b border-landing-border bg-landing-bg/90 backdrop-blur-md">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-2 px-container-padding-mobile py-3 sm:gap-3 sm:py-4 md:px-8">
         <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
-          <HeaderTooltip label="관리자 페이지 이동" className="shrink-0">
+          <HeaderTooltip label="관리자 페이지" className="shrink-0">
             <Link
               href="/admin"
-              aria-label="관리자 페이지 이동"
+              aria-label="관리자 페이지"
               className="shrink-0 rounded-md outline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400"
             >
               <Gavel className="h-5 w-5 text-blue-400 sm:h-6 sm:w-6" aria-hidden />

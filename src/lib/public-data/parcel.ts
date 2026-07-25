@@ -32,13 +32,24 @@ export function normalizeParcelCodes(input: {
   ji?: string | number;
   pnu?: string;
 }): ParcelCodes | null {
+  // 시군구·법정동·본번이 있으면 명시 코드를 우선 (PNU와 동시에 채워진 경우 혼동 방지)
+  const sigunguCd = String(input.sigunguCd || "").replace(/\D/g, "");
+  const bjdongCd = String(input.bjdongCd || "").replace(/\D/g, "");
+  const hasBun = String(input.bun ?? "").replace(/\D/g, "").length > 0;
+
+  if (sigunguCd.length === 5 && bjdongCd.length === 5 && hasBun) {
+    const platGbCd = String(input.platGbCd ?? "0").replace(/\D/g, "").slice(0, 1) || "0";
+    const bun = pad4(input.bun ?? "0");
+    const ji = pad4(input.ji ?? "0");
+    const codes = { sigunguCd, bjdongCd, platGbCd, bun, ji };
+    return { ...codes, pnu: buildPnu(codes) };
+  }
+
   if (input.pnu) {
     const fromPnu = parsePnu(input.pnu);
     if (fromPnu) return fromPnu;
   }
 
-  const sigunguCd = String(input.sigunguCd || "").replace(/\D/g, "");
-  const bjdongCd = String(input.bjdongCd || "").replace(/\D/g, "");
   if (sigunguCd.length !== 5 || bjdongCd.length !== 5) return null;
 
   const platGbCd = String(input.platGbCd ?? "0").replace(/\D/g, "").slice(0, 1) || "0";

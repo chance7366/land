@@ -7,7 +7,9 @@ import { verifySessionValueEdge } from "@/lib/session-edge";
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (!pathname.startsWith("/admin")) {
+  const isAdminPage = pathname.startsWith("/admin");
+  const isAdminApi = pathname.startsWith("/api/admin");
+  if (!isAdminPage && !isAdminApi) {
     return NextResponse.next();
   }
 
@@ -28,6 +30,9 @@ export async function middleware(request: NextRequest) {
   const userId = session ? await verifySessionValueEdge(session) : null;
 
   if (!userId) {
+    if (isAdminApi) {
+      return NextResponse.json({ error: "관리자 로그인이 필요합니다." }, { status: 401 });
+    }
     const loginUrl = new URL("/admin/login", request.url);
     loginUrl.searchParams.set("from", pathname);
     return NextResponse.redirect(loginUrl);
@@ -37,5 +42,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin/:path*", "/api/admin/:path*"],
 };
