@@ -58,7 +58,10 @@ type PropertyFormProps = {
   initial?: Property;
 };
 
-type FormState = Record<string, string | number | boolean | string[] | null | undefined>;
+type FormState = Record<
+  string,
+  string | number | boolean | string[] | Record<string, unknown> | null | undefined
+>;
 
 function parseSpecs(json: string | undefined | null): Record<string, unknown> {
   try {
