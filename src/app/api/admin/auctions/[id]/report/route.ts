@@ -87,6 +87,7 @@ async function uploadReportPdf(
     return `${url}${sep}t=${Date.now()}`;
   };
   const fileStem = kind === "general" ? `${auctionId}-general` : auctionId;
+  const onVercel = Boolean(process.env.VERCEL);
 
   if (isSupabaseEnabled()) {
     try {
@@ -94,12 +95,26 @@ async function uploadReportPdf(
       const publicUrl = await uploadPropertyImage(storagePath, buffer, "application/pdf");
       return withCacheBust(publicUrl);
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // Vercel 로컬 디스크는 ephemeral — /uploads 폴백 URL은 프로덕션에서 404가 됨
+      if (onVercel) {
+        throw new Error(
+          `Supabase Storage PDF 업로드 실패: ${msg}. ` +
+            "property-images 버킷 Allowed MIME에 application/pdf 가 있는지 확인하세요.",
+        );
+      }
       console.warn(
         "[auctions/report] Supabase Storage PDF 업로드 실패 → 로컬 저장으로 폴백. " +
           "Dashboard에서 property-images 버킷 Allowed MIME에 application/pdf를 추가하세요.",
         e,
       );
     }
+  }
+
+  if (onVercel) {
+    throw new Error(
+      "프로덕션에서는 Supabase Storage에 PDF를 저장해야 합니다. DATA_PROVIDER/Storage 설정을 확인하세요.",
+    );
   }
 
   const dir = path.join(getUploadDir("auctions"));
