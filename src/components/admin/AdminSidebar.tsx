@@ -12,6 +12,7 @@ import {
   Gavel,
   LayoutDashboard,
   Newspaper,
+  Scale,
   Search,
   Star,
   User,
@@ -29,6 +30,7 @@ const NAV = [
   { href: "/admin/reviews", label: "성공스토리", Icon: Star },
   { href: "/admin/consultations", label: "상담 예약", Icon: CalendarDays },
   { href: "/admin/legal", label: "찬스상담소", Icon: CircleHelp },
+  { href: "/admin/legal-counsel", label: "법령전문상담", Icon: Scale },
 ];
 
 type AdminSidebarProps = {
@@ -71,7 +73,10 @@ function useGeminiToday(pathname: string) {
 }
 
 function isNavActive(pathname: string, href: string) {
-  return pathname === href || (href !== "/admin" && pathname.startsWith(href));
+  if (pathname === href) return true;
+  if (href === "/admin") return false;
+  // /admin/legal 이 /admin/legal-counsel 에 매칭되지 않도록 경계 검사
+  return pathname.startsWith(`${href}/`);
 }
 
 export function AdminSidebar({ authEnabled }: AdminSidebarProps) {
