@@ -1,11 +1,16 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
   CheckCircle2,
+  CircleAlert,
   ImagePlus,
   Loader2,
   RefreshCw,
+  ShieldCheck,
   Upload,
   X,
 } from "lucide-react";
@@ -15,6 +20,13 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { PROPERTY_TAGS, suggestPropertyTitle } from "@/lib/property-fields";
 import { parseImages, parseTags } from "@/lib/format";
 import { askManageCodeConflict, type ManageCodeConflictResponse } from "@/lib/manage-code-conflict";
+import { lintPropertyAdCopy } from "@/lib/property-ad-linter";
+import {
+  MAINTENANCE_BREAKDOWN_KEYS,
+  needsMaintenanceBreakdown,
+  type MaintenanceMode,
+} from "@/lib/property-maintenance";
+import { OFFICE_PROFILE } from "@/lib/office-profile";
 import {
   CATEGORY_GROUP_LABELS,
   CATEGORY_GROUP_OPTIONS,
@@ -32,11 +44,11 @@ import {
 const MAX_IMAGES = 5;
 
 const STEP_LABELS = [
-  "기본·거래",
-  "상세·면적",
-  "시설·옵션",
-  "사진",
-  "소유자·태그",
+  { title: "기본정보", sub: "분류 · 거래" },
+  { title: "상세정보", sub: "면적 · 층 · 방향" },
+  { title: "가격/관리비", sub: "거래가 · 7비목" },
+  { title: "시설·법적", sub: "옵션 · 위반 · 담당" },
+  { title: "미디어", sub: "사진 · 소유자" },
 ] as const;
 
 const inputClass =
@@ -79,6 +91,18 @@ function propertyToFormState(property?: Property): FormState {
       ownerRelation: "본인",
       keyMoneyHidden: false,
       vatIncluded: false,
+      maintenanceMode: "NONE",
+      maintenanceBreakdown: {},
+      maintenanceBreakdownReason: "",
+      illegalBuilding: false,
+      unregisteredBuilding: false,
+      unregisteredConfirmed: false,
+      floorDisplayMode: "NUMBER",
+      floorBand: "",
+      actualParking: "",
+      useApprovalDate: "",
+      listingAgentName: OFFICE_PROFILE.agentName,
+      listingAgentPhone: OFFICE_PROFILE.agentPhone,
     };
   }
 
@@ -151,6 +175,7 @@ function propertyToFormState(property?: Property): FormState {
 
 export function PropertyForm({ initial }: PropertyFormProps) {
   const [form, setForm] = useState<FormState>(() => propertyToFormState(initial));
+  const [wizardStep, setWizardStep] = useState(1);
   const [imageInput, setImageInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -163,12 +188,56 @@ export function PropertyForm({ initial }: PropertyFormProps) {
   const group = useMemo(() => getCategoryGroup(category), [category]);
   const imageList = (form.images as string[]) ?? [];
   const remainingSlots = MAX_IMAGES - imageList.length;
+  const isRetailLike = group === "RETAIL_OFFICE" || group === "LAND";
+  const maintMode = (String(form.maintenanceMode || "NONE") as MaintenanceMode) || "NONE";
+  const feeManwon =
+    form.maintenanceFee !== "" && form.maintenanceFee != null
+      ? Number(form.maintenanceFee)
+      : null;
+  const showBreakdown = needsMaintenanceBreakdown(maintMode, feeManwon);
+  const breakdown = (form.maintenanceBreakdown as Record<string, unknown>) || {};
+  const adWarnings = lintPropertyAdCopy(String(form.description || ""));
+
   const fieldsByStep = useMemo(() => {
     const steps = [1, 2, 3, 4] as FormStep[];
     return Object.fromEntries(
       steps.map((s) => [s, uniqueFields(getFieldsForStep(group, s))]),
     ) as Record<FormStep, FieldSpec[]>;
   }, [group]);
+
+  const legalChecklist = useMemo(() => {
+    const addrOk = Boolean(form.sido && form.sigungu && form.eupmyeondong);
+    const areaOk = form.exclusiveArea !== "" && form.exclusiveArea != null;
+    const priceOk =
+      dealType === "SALE" || dealType === "PRE_SALE"
+        ? Number(form.price) > 0
+        : form.deposit !== "" && form.deposit != null;
+    const maintOk =
+      maintMode !== "FIXED" ||
+      (feeManwon != null && feeManwon < 10) ||
+      showBreakdown;
+    const dirOk =
+      group === "LAND" ||
+      Boolean(form.direction) ||
+      group === "RETAIL_OFFICE";
+    const parkOk = group === "LAND" || Boolean(form.totalParking || form.parking || form.actualParking);
+    return [
+      { id: "addr", label: "소재지(시군구·읍면동)", ok: addrOk },
+      { id: "area", label: "전용면적", ok: areaOk || group === "LAND" },
+      { id: "price", label: "거래 가격", ok: priceOk },
+      { id: "maint", label: "관리비·7비목 규칙", ok: maintOk },
+      { id: "dir", label: "방향", ok: Boolean(dirOk) },
+      { id: "park", label: "주차 정보", ok: Boolean(parkOk) },
+      { id: "approve", label: "사용승인일(권장)", ok: Boolean(form.useApprovalDate || form.approvalDate) },
+      { id: "illegal", label: "위반건축물 표기", ok: typeof form.illegalBuilding === "boolean" },
+      { id: "unreg", label: "미등기 확인", ok: Boolean(form.unregisteredConfirmed) },
+      {
+        id: "agent",
+        label: "소속 중개사 병기",
+        ok: Boolean(form.listingAgentName && form.listingAgentPhone),
+      },
+    ];
+  }, [form, dealType, group, maintMode, feeManwon, showBreakdown]);
 
   function setField(key: string, value: FormState[string]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -296,6 +365,21 @@ export function PropertyForm({ initial }: PropertyFormProps) {
       tags: form.tags as string[],
       moveInDate: form.moveInType === "지정일" ? form.moveInDate || null : null,
       publishedAt: form.publishedAt || null,
+      maintenanceMode: form.maintenanceMode || "NONE",
+      maintenanceBreakdown: form.maintenanceBreakdown || {},
+      maintenanceBreakdownReason: form.maintenanceBreakdownReason || "",
+      illegalBuilding: Boolean(form.illegalBuilding),
+      unregisteredBuilding: Boolean(form.unregisteredBuilding),
+      unregisteredConfirmed: Boolean(form.unregisteredConfirmed),
+      floorDisplayMode: isRetailLike ? "NUMBER" : form.floorDisplayMode || "NUMBER",
+      floorBand: isRetailLike ? null : form.floorBand || null,
+      actualParking:
+        form.actualParking !== "" && form.actualParking != null
+          ? Number(form.actualParking)
+          : null,
+      useApprovalDate: form.useApprovalDate || null,
+      listingAgentName: form.listingAgentName || null,
+      listingAgentPhone: form.listingAgentPhone || null,
     };
 
     const url = initial ? `/api/admin/properties/${initial.id}` : "/api/admin/properties";
@@ -337,282 +421,591 @@ export function PropertyForm({ initial }: PropertyFormProps) {
     navigateTo("/admin/properties");
   }
 
+  const checklistOk = legalChecklist.filter((c) => c.ok).length;
+  const facilityFields = fieldsByStep[3].filter(
+    (f) => !["maintenanceFee", "maintenanceIncludes", "maintenanceBilling"].includes(f.field_name),
+  );
+  const maintFields = fieldsByStep[3].filter((f) =>
+    ["maintenanceFee", "maintenanceIncludes", "maintenanceBilling"].includes(f.field_name),
+  );
+
+  function setBreakdownKey(key: string, value: string) {
+    const next = { ...breakdown };
+    if (value === "" || value === "ACTUAL") next[key] = value === "ACTUAL" ? "ACTUAL" : null;
+    else next[key] = Number(value);
+    setField("maintenanceBreakdown", next);
+  }
+
   return (
-    <div className="mx-auto max-w-5xl pb-28 font-[family-name:var(--font-unifine),Outfit,sans-serif] text-slate-200">
-      <p className="mb-4 text-sm text-slate-400">
-        {isEdit
-          ? "기존 매물을 수정합니다. 수정 후 저장하세요."
-          : "카테고리·거래유형을 선택한 뒤 항목을 입력하고 저장하세요."}
+    <div className="mx-auto max-w-[1200px] pb-28 font-[family-name:var(--font-unifine),Outfit,sans-serif] text-slate-200">
+      <p className="mb-3 text-sm text-slate-400">
+        {isEdit ? "기존 매물 수정 · 법적 준수 위저드" : "법적 준수 위저드로 매물을 등록합니다."}
       </p>
       <p className="mb-4 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-200">
         <span className="text-slate-400">관리번호 · </span>
         <span className="font-medium tabular-nums text-[#d4bfff]">
           {initial?.manageCode || "등록 저장 시 자동 생성 (매물_00000000)"}
         </span>
-      </p>
-
-      <div className="flex flex-wrap gap-2 text-[11px]">
-        {STEP_LABELS.map((label, i) => (
-          <span
-            key={label}
-            className="rounded-full border border-white/10 px-2.5 py-1 text-slate-400"
-          >
-            {i + 1}. {label}
-          </span>
-        ))}
-        <span className="rounded-full border border-[#913dff]/40 bg-[#913dff]/15 px-2.5 py-1 font-semibold text-[#d4bfff]">
+        <span className="ml-2 rounded-full border border-[#913dff]/40 bg-[#913dff]/15 px-2 py-0.5 text-[11px] font-semibold text-[#d4bfff]">
           {CATEGORY_GROUP_LABELS[group]}
         </span>
-      </div>
+      </p>
+
+      <GlassCard className="mb-4 p-4">
+        <div className="mb-3 flex items-center justify-between text-xs text-slate-400">
+          <span className="font-bold text-white">등록 단계</span>
+          <span>
+            Step {wizardStep} / {STEP_LABELS.length}
+          </span>
+        </div>
+        <ol className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          {STEP_LABELS.map((s, i) => {
+            const n = i + 1;
+            const active = n === wizardStep;
+            const done = n < wizardStep;
+            return (
+              <li key={s.title}>
+                <button
+                  type="button"
+                  onClick={() => setWizardStep(n)}
+                  className={`w-full rounded-xl border px-2 py-2 text-left transition ${
+                    active
+                      ? "border-[#a78bfa]/55 bg-[#a78bfa]/15"
+                      : done
+                        ? "border-emerald-400/30 bg-emerald-500/10"
+                        : "border-white/10 bg-white/[0.03]"
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5 text-[11px] font-bold text-white/90">
+                    <span
+                      className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${
+                        done ? "bg-emerald-500/30 text-emerald-200" : "bg-white/10 text-white/70"
+                      }`}
+                    >
+                      {done ? <Check className="h-3 w-3" /> : n}
+                    </span>
+                    {s.title}
+                  </span>
+                  <span className="mt-0.5 block pl-6 text-[10px] text-white/40">{s.sub}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      </GlassCard>
 
       {error && (
-        <p className="mt-4 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm text-red-300">
+        <p className="mb-4 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm text-red-300">
           {error}
         </p>
       )}
 
-      <div className="mt-6 space-y-5">
-        <Section n={1} title="기본정보 · 거래조건">
-          <div className="space-y-4">
-            <Field label="카테고리 그룹">
-              <div className="flex flex-wrap gap-2">
-                {(Object.keys(CATEGORY_GROUP_LABELS) as CategoryGroup[]).map((g) => (
-                  <ChipButton
-                    key={g}
-                    active={group === g}
-                    label={CATEGORY_GROUP_LABELS[g]}
-                    onClick={() => setCategoryGroup(g)}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="space-y-4">
+          {wizardStep === 1 && (
+            <Section n={1} title="기본정보 · 거래조건">
+              <div className="space-y-4">
+                <Field label="카테고리 그룹">
+                  <div className="flex flex-wrap gap-2">
+                    {(Object.keys(CATEGORY_GROUP_LABELS) as CategoryGroup[]).map((g) => (
+                      <ChipButton
+                        key={g}
+                        active={group === g}
+                        label={CATEGORY_GROUP_LABELS[g]}
+                        onClick={() => setCategoryGroup(g)}
+                      />
+                    ))}
+                  </div>
+                </Field>
+                <Field label="세부 유형">
+                  <div className="flex flex-wrap gap-2">
+                    {CATEGORY_GROUP_OPTIONS.find((g) => g.group === group)?.categories.map((item) => (
+                      <ChipButton
+                        key={item.value}
+                        active={category === item.value}
+                        label={item.label}
+                        onClick={() => setField("category", item.value)}
+                      />
+                    ))}
+                  </div>
+                </Field>
+                <Field label="거래 유형">
+                  <div className="flex flex-wrap gap-2">
+                    {DEAL_TYPE_OPTIONS.map((item) => (
+                      <ChipButton
+                        key={item.value}
+                        active={dealType === item.value}
+                        label={item.label}
+                        onClick={() => setField("type", item.value)}
+                      />
+                    ))}
+                  </div>
+                </Field>
+                {(dealType === "RENT" || dealType === "SHORT_TERM") && (
+                  <Field label="전세/월세">
+                    <div className="flex flex-wrap gap-2">
+                      {DEAL_SUBTYPE_OPTIONS.map((item) => (
+                        <ChipButton
+                          key={item.value}
+                          active={String(form.dealSubType) === item.value}
+                          label={item.label}
+                          onClick={() => {
+                            setField("dealSubType", item.value);
+                            setField("isJeonse", item.value === "JEONSE");
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </Field>
+                )}
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Field label="노출 상태">
+                    <select
+                      className={inputClass}
+                      value={String(form.status)}
+                      onChange={(e) => setField("status", e.target.value)}
+                    >
+                      <option value="ACTIVE">노출</option>
+                      <option value="HIDDEN">숨김</option>
+                      <option value="SOLD">거래완료</option>
+                    </select>
+                  </Field>
+                  <Field label="매물 등록일">
+                    <input
+                      type="date"
+                      className={inputClass}
+                      value={String(form.publishedAt ?? "")}
+                      onChange={(e) => setField("publishedAt", e.target.value)}
+                    />
+                  </Field>
+                  <Field label="상태 / Featured" className="md:col-span-2">
+                    <label className="flex items-center gap-2 text-sm text-slate-300">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(form.featured)}
+                        onChange={(e) => setField("featured", e.target.checked)}
+                      />
+                      Featured 매물
+                    </label>
+                  </Field>
+                  {fieldsByStep[1].map((field) => (
+                    <DynamicField
+                      key={`1-${field.field_name}`}
+                      field={field}
+                      form={form}
+                      dealType={dealType}
+                      setField={setField}
+                      toggleMulti={toggleMulti}
+                      onSuggestTitle={field.field_name === "title" ? suggestTitle : undefined}
+                    />
+                  ))}
+                </div>
+              </div>
+            </Section>
+          )}
+
+          {wizardStep === 2 && (
+            <Section n={2} title="매물 상세 · 면적">
+              <div className="grid gap-3 md:grid-cols-2">
+                {fieldsByStep[2].map((field) => (
+                  <DynamicField
+                    key={`2-${field.field_name}`}
+                    field={field}
+                    form={form}
+                    dealType={dealType}
+                    setField={setField}
+                    toggleMulti={toggleMulti}
                   />
                 ))}
-              </div>
-            </Field>
-            <Field label="세부 유형">
-              <div className="flex flex-wrap gap-2">
-                {CATEGORY_GROUP_OPTIONS.find((g) => g.group === group)?.categories.map((item) => (
-                  <ChipButton
-                    key={item.value}
-                    active={category === item.value}
-                    label={item.label}
-                    onClick={() => setField("category", item.value)}
+                <Field label="실사용 가능 주차대수">
+                  <input
+                    type="number"
+                    className={inputClass}
+                    value={form.actualParking == null ? "" : String(form.actualParking)}
+                    onChange={(e) => setField("actualParking", e.target.value)}
                   />
-                ))}
-              </div>
-            </Field>
-            <Field label="거래 유형">
-              <div className="flex flex-wrap gap-2">
-                {DEAL_TYPE_OPTIONS.map((item) => (
-                  <ChipButton
-                    key={item.value}
-                    active={dealType === item.value}
-                    label={item.label}
-                    onClick={() => setField("type", item.value)}
+                </Field>
+                <Field label="사용승인일">
+                  <input
+                    type="date"
+                    className={inputClass}
+                    value={String(form.useApprovalDate ?? "")}
+                    onChange={(e) => setField("useApprovalDate", e.target.value)}
                   />
-                ))}
+                </Field>
               </div>
-            </Field>
-            {(dealType === "RENT" || dealType === "SHORT_TERM") && (
-              <Field label="전세/월세">
-                <div className="flex flex-wrap gap-2">
-                  {DEAL_SUBTYPE_OPTIONS.map((item) => (
+              <label
+                className={`mt-3 flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm ${
+                  isRetailLike
+                    ? "cursor-not-allowed border-white/10 text-white/30"
+                    : "border-white/15 text-slate-300"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  disabled={isRetailLike}
+                  checked={form.floorDisplayMode === "BAND"}
+                  onChange={(e) => {
+                    setField("floorDisplayMode", e.target.checked ? "BAND" : "NUMBER");
+                    if (!e.target.checked) setField("floorBand", "");
+                  }}
+                />
+                중개의뢰인 미희망 시 층수 저/중/고 표시
+                {isRetailLike ? (
+                  <span className="ml-auto text-[10px] text-rose-300/80">상가·비주거 불가</span>
+                ) : null}
+              </label>
+              {form.floorDisplayMode === "BAND" && !isRetailLike ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(["LOW", "MID", "HIGH"] as const).map((b) => (
                     <ChipButton
-                      key={item.value}
-                      active={String(form.dealSubType) === item.value}
-                      label={item.label}
-                      onClick={() => {
-                        setField("dealSubType", item.value);
-                        setField("isJeonse", item.value === "JEONSE");
-                      }}
+                      key={b}
+                      active={form.floorBand === b}
+                      label={b === "LOW" ? "저" : b === "MID" ? "중" : "고"}
+                      onClick={() => setField("floorBand", b)}
+                    />
+                  ))}
+                </div>
+              ) : null}
+              {fieldsByStep[2].length === 0 && (
+                <p className="text-sm text-slate-500">이 유형에 해당하는 상세 필드가 없습니다.</p>
+              )}
+            </Section>
+          )}
+
+          {wizardStep === 3 && (
+            <Section n={3} title="가격 · 관리비">
+              <p className="mb-3 text-xs text-slate-500">
+                거래 가액은 1단계에서 입력합니다. 여기서는 관리비 부과 방식과 7대 비목을 설정합니다.
+              </p>
+              <Field label="관리비 부과 방식">
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      ["NONE", "관리비 없음"],
+                      ["ACTUAL", "실비 부과"],
+                      ["FIXED", "정액 관리비"],
+                    ] as const
+                  ).map(([k, t]) => (
+                    <ChipButton
+                      key={k}
+                      active={maintMode === k}
+                      label={t}
+                      onClick={() => setField("maintenanceMode", k)}
                     />
                   ))}
                 </div>
               </Field>
-            )}
-            <div className="grid gap-3 md:grid-cols-2">
-              <Field label="노출 상태">
-                <select
-                  className={inputClass}
-                  value={String(form.status)}
-                  onChange={(e) => setField("status", e.target.value)}
-                >
-                  <option value="ACTIVE">노출</option>
-                  <option value="HIDDEN">숨김</option>
-                  <option value="SOLD">거래완료</option>
-                </select>
-              </Field>
-              <Field label="매물 등록일">
-                <input
-                  type="date"
-                  className={inputClass}
-                  value={String(form.publishedAt ?? "")}
-                  onChange={(e) => setField("publishedAt", e.target.value)}
-                />
-              </Field>
-              <Field label="상태 / Featured" className="md:col-span-2">
-                <label className="flex items-center gap-2 text-sm text-slate-300">
+              {maintMode === "FIXED" ? (
+                <div className="mt-3 space-y-3 rounded-xl border border-amber-400/30 bg-amber-500/5 p-3">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {maintFields.map((field) => (
+                      <DynamicField
+                        key={`m-${field.field_name}`}
+                        field={field}
+                        form={form}
+                        dealType={dealType}
+                        setField={setField}
+                        toggleMulti={toggleMulti}
+                      />
+                    ))}
+                  </div>
+                  {showBreakdown ? (
+                    <>
+                      <p className="flex items-center gap-1.5 text-xs font-bold text-amber-200">
+                        <CircleAlert className="h-3.5 w-3.5" />
+                        월 10만원 이상 — 7대 비목 금액 필수 (원 단위, 실비는 ACTUAL)
+                      </p>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {MAINTENANCE_BREAKDOWN_KEYS.map((m) => (
+                          <Field key={m.key} label={`${m.label} (원)`}>
+                            <input
+                              className={inputClass}
+                              placeholder="금액 또는 ACTUAL"
+                              value={
+                                breakdown[m.key] === "ACTUAL" || breakdown[m.key] === null
+                                  ? breakdown[m.key] === "ACTUAL"
+                                    ? "ACTUAL"
+                                    : ""
+                                  : breakdown[m.key] == null
+                                    ? ""
+                                    : String(breakdown[m.key])
+                              }
+                              onChange={(e) => setBreakdownKey(m.key, e.target.value)}
+                            />
+                          </Field>
+                        ))}
+                      </div>
+                      <Field label="비목 미고지 시 사유">
+                        <select
+                          className={inputClass}
+                          value={String(form.maintenanceBreakdownReason ?? "")}
+                          onChange={(e) => setField("maintenanceBreakdownReason", e.target.value)}
+                        >
+                          <option value="">해당 없음</option>
+                          <option value="임대인 세부 내역 미고지">임대인 세부 내역 미고지</option>
+                          <option value="관리규약상 비공개">관리규약상 비공개</option>
+                        </select>
+                      </Field>
+                    </>
+                  ) : (
+                    <p className="text-xs text-slate-500">10만원 미만이면 세부 비목 생략 가능</p>
+                  )}
+                </div>
+              ) : null}
+              {maintMode !== "FIXED" && maintFields.length > 0 ? (
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  {maintFields.map((field) => (
+                    <DynamicField
+                      key={`m2-${field.field_name}`}
+                      field={field}
+                      form={form}
+                      dealType={dealType}
+                      setField={setField}
+                      toggleMulti={toggleMulti}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </Section>
+          )}
+
+          {wizardStep === 4 && (
+            <Section n={4} title="시설 · 법적 상태 · 담당">
+              <div className="mb-4 grid gap-3 sm:grid-cols-2">
+                <label className="flex items-center gap-2 rounded-xl border border-white/15 px-3 py-2.5 text-sm text-slate-300">
                   <input
                     type="checkbox"
-                    checked={Boolean(form.featured)}
-                    onChange={(e) => setField("featured", e.target.checked)}
+                    checked={Boolean(form.illegalBuilding)}
+                    onChange={(e) => setField("illegalBuilding", e.target.checked)}
                   />
-                  Featured 매물
+                  위반건축물
                 </label>
-              </Field>
-              {fieldsByStep[1].map((field) => (
-                <DynamicField
-                  key={`1-${field.field_name}`}
-                  field={field}
-                  form={form}
-                  dealType={dealType}
-                  setField={setField}
-                  toggleMulti={toggleMulti}
-                  onSuggestTitle={field.field_name === "title" ? suggestTitle : undefined}
-                />
-              ))}
-            </div>
-          </div>
-        </Section>
-
-        <Section n={2} title="매물 상세 · 면적">
-          <div className="grid gap-3 md:grid-cols-2">
-            {fieldsByStep[2].map((field) => (
-              <DynamicField
-                key={`2-${field.field_name}`}
-                field={field}
-                form={form}
-                dealType={dealType}
-                setField={setField}
-                toggleMulti={toggleMulti}
-              />
-            ))}
-          </div>
-          {fieldsByStep[2].length === 0 && (
-            <p className="text-sm text-slate-500">이 유형에 해당하는 상세 필드가 없습니다.</p>
-          )}
-        </Section>
-
-        <Section n={3} title="시설 · 옵션">
-          <div className="grid gap-3 md:grid-cols-2">
-            {fieldsByStep[3].map((field) => (
-              <DynamicField
-                key={`3-${field.field_name}`}
-                field={field}
-                form={form}
-                dealType={dealType}
-                setField={setField}
-                toggleMulti={toggleMulti}
-              />
-            ))}
-          </div>
-          {fieldsByStep[3].length === 0 && (
-            <p className="text-sm text-slate-500">이 유형에 해당하는 시설·옵션 필드가 없습니다.</p>
-          )}
-        </Section>
-
-        <Section n={4} title="사진" hint="최대 5장 · JPG/PNG/WEBP/GIF · 각 5MB 이하 · 첫 번째가 대표 이미지">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            multiple
-            className="hidden"
-            onChange={(e) => void uploadFiles(e.target.files)}
-          />
-          <div className="flex flex-wrap gap-3">
-            {imageList.map((url, i) => (
-              <div
-                key={`${url}-${i}`}
-                className={`relative h-24 w-24 overflow-hidden rounded-xl border ${
-                  i === 0 ? "border-[#d4bfff]/60 ring-1 ring-[#d4bfff]/30" : "border-white/10"
-                }`}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt={`매물 사진 ${i + 1}`} className="h-full w-full object-cover" />
-                {i === 0 && (
-                  <span className="absolute left-1 top-1 rounded bg-[#913dff]/90 px-1.5 py-0.5 text-[9px] font-bold text-white">
-                    대표
-                  </span>
-                )}
-                <button
-                  type="button"
-                  className="absolute right-1 top-1 rounded-full bg-black/70 p-1"
-                  onClick={() => removeImage(i)}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-                {i !== 0 && (
-                  <button
-                    type="button"
-                    className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[9px] text-white"
-                    onClick={() => setRepresentative(i)}
-                  >
-                    대표로
-                  </button>
-                )}
+                <label className="flex items-center gap-2 rounded-xl border border-white/15 px-3 py-2.5 text-sm text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form.unregisteredBuilding)}
+                    onChange={(e) => setField("unregisteredBuilding", e.target.checked)}
+                  />
+                  미등기 건물
+                </label>
+                <label className="flex items-center gap-2 rounded-xl border border-white/15 px-3 py-2.5 text-sm text-slate-300 sm:col-span-2">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form.unregisteredConfirmed)}
+                    onChange={(e) => setField("unregisteredConfirmed", e.target.checked)}
+                  />
+                  미등기·등기 상태 확인 완료
+                </label>
               </div>
-            ))}
-            <button
-              type="button"
-              disabled={remainingSlots <= 0 || uploading}
-              onClick={() => fileInputRef.current?.click()}
-              className="flex h-24 w-24 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-white/20 text-slate-400 hover:border-[#4dabff]/50 disabled:opacity-40"
-            >
-              {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
-              <span className="text-[10px]">
-                {uploading ? "업로드…" : `추가 (${imageList.length}/${MAX_IMAGES})`}
-              </span>
-            </button>
-          </div>
-          <Field label="또는 URL로 추가" className="mt-4">
-            <div className="flex gap-2">
-              <input
-                className={inputClass}
-                value={imageInput}
-                onChange={(e) => setImageInput(e.target.value)}
-                disabled={remainingSlots <= 0}
-                placeholder="https://..."
-              />
-              <button
-                type="button"
-                onClick={addImageUrl}
-                disabled={remainingSlots <= 0}
-                className="shrink-0 rounded-xl border border-white/15 px-4 text-sm text-slate-200 hover:bg-white/5 disabled:opacity-40"
-              >
-                추가
-              </button>
-            </div>
-          </Field>
-        </Section>
-
-        <Section n={5} title="소유자 검증 · 태그">
-          <div className="grid gap-3 md:grid-cols-2">
-            {fieldsByStep[4].map((field) => (
-              <DynamicField
-                key={`4-${field.field_name}`}
-                field={field}
-                form={form}
-                dealType={dealType}
-                setField={setField}
-                toggleMulti={toggleMulti}
-              />
-            ))}
-            <Field label="태그" className="md:col-span-2">
-              <div className="flex flex-wrap gap-2">
-                {PROPERTY_TAGS.map((tag) => (
-                  <ChipButton
-                    key={tag}
-                    active={((form.tags as string[]) ?? []).includes(tag)}
-                    label={tag}
-                    onClick={() => toggleTag(tag)}
+              {form.illegalBuilding ? (
+                <p className="mb-3 rounded-lg border border-rose-400/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">
+                  상세 설명에 「위반건축물」 고지를 포함하세요.
+                </p>
+              ) : null}
+              <div className="mb-4 grid gap-3 md:grid-cols-2 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                <Field label="개업공인중개사">
+                  <input className={inputClass} value={OFFICE_PROFILE.brokerName} readOnly />
+                </Field>
+                <Field label="개업 연락처">
+                  <input className={inputClass} value={OFFICE_PROFILE.brokerPhone} readOnly />
+                </Field>
+                <Field label="소속공인중개사">
+                  <input
+                    className={inputClass}
+                    value={String(form.listingAgentName ?? "")}
+                    onChange={(e) => setField("listingAgentName", e.target.value)}
+                  />
+                </Field>
+                <Field label="소속 연락처">
+                  <input
+                    className={inputClass}
+                    value={String(form.listingAgentPhone ?? "")}
+                    onChange={(e) => setField("listingAgentPhone", e.target.value)}
+                  />
+                </Field>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {facilityFields.map((field) => (
+                  <DynamicField
+                    key={`3-${field.field_name}`}
+                    field={field}
+                    form={form}
+                    dealType={dealType}
+                    setField={setField}
+                    toggleMulti={toggleMulti}
                   />
                 ))}
               </div>
-            </Field>
+              {facilityFields.length === 0 && (
+                <p className="text-sm text-slate-500">추가 시설·옵션 필드가 없습니다.</p>
+              )}
+            </Section>
+          )}
+
+          {wizardStep === 5 && (
+            <>
+              <Section n={5} title="사진" hint="최대 5장 · JPG/PNG/WEBP/GIF · 각 5MB 이하 · 첫 번째가 대표 이미지">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => void uploadFiles(e.target.files)}
+                />
+                <div className="flex flex-wrap gap-3">
+                  {imageList.map((url, i) => (
+                    <div
+                      key={`${url}-${i}`}
+                      className={`relative h-24 w-24 overflow-hidden rounded-xl border ${
+                        i === 0 ? "border-[#d4bfff]/60 ring-1 ring-[#d4bfff]/30" : "border-white/10"
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={`매물 사진 ${i + 1}`} className="h-full w-full object-cover" />
+                      {i === 0 && (
+                        <span className="absolute left-1 top-1 rounded bg-[#913dff]/90 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                          대표
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        className="absolute right-1 top-1 rounded-full bg-black/70 p-1"
+                        onClick={() => removeImage(i)}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                      {i !== 0 && (
+                        <button
+                          type="button"
+                          className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[9px] text-white"
+                          onClick={() => setRepresentative(i)}
+                        >
+                          대표로
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    disabled={remainingSlots <= 0 || uploading}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex h-24 w-24 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-white/20 text-slate-400 hover:border-[#4dabff]/50 disabled:opacity-40"
+                  >
+                    {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
+                    <span className="text-[10px]">
+                      {uploading ? "업로드…" : `추가 (${imageList.length}/${MAX_IMAGES})`}
+                    </span>
+                  </button>
+                </div>
+                <Field label="또는 URL로 추가" className="mt-4">
+                  <div className="flex gap-2">
+                    <input
+                      className={inputClass}
+                      value={imageInput}
+                      onChange={(e) => setImageInput(e.target.value)}
+                      disabled={remainingSlots <= 0}
+                      placeholder="https://..."
+                    />
+                    <button
+                      type="button"
+                      onClick={addImageUrl}
+                      disabled={remainingSlots <= 0}
+                      className="shrink-0 rounded-xl border border-white/15 px-4 text-sm text-slate-200 hover:bg-white/5 disabled:opacity-40"
+                    >
+                      추가
+                    </button>
+                  </div>
+                </Field>
+              </Section>
+
+              <Section n={5} title="소유자 검증 · 설명 · 태그">
+                <div className="grid gap-3 md:grid-cols-2">
+                  {fieldsByStep[4].map((field) => (
+                    <DynamicField
+                      key={`4-${field.field_name}`}
+                      field={field}
+                      form={form}
+                      dealType={dealType}
+                      setField={setField}
+                      toggleMulti={toggleMulti}
+                    />
+                  ))}
+                  <Field label="태그" className="md:col-span-2">
+                    <div className="flex flex-wrap gap-2">
+                      {PROPERTY_TAGS.map((tag) => (
+                        <ChipButton
+                          key={tag}
+                          active={((form.tags as string[]) ?? []).includes(tag)}
+                          label={tag}
+                          onClick={() => toggleTag(tag)}
+                        />
+                      ))}
+                    </div>
+                  </Field>
+                </div>
+                {adWarnings.length > 0 ? (
+                  <p className="mt-3 flex items-center gap-1.5 rounded-lg border border-rose-400/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">
+                    <CircleAlert className="h-3.5 w-3.5 shrink-0" />
+                    부당 표시·광고 우려 문구: {adWarnings.join(", ")}
+                  </p>
+                ) : null}
+              </Section>
+            </>
+          )}
+
+          <div className="flex flex-wrap justify-between gap-2">
+            <button
+              type="button"
+              disabled={wizardStep === 1}
+              onClick={() => setWizardStep((s) => Math.max(1, s - 1))}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 px-4 py-2 text-sm font-bold text-slate-300 disabled:opacity-30"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              이전
+            </button>
+            {wizardStep < 5 ? (
+              <button
+                type="button"
+                onClick={() => setWizardStep((s) => Math.min(5, s + 1))}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#4dabff] to-[#913dff] px-4 py-2 text-sm font-bold text-white"
+              >
+                다음
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            ) : null}
           </div>
-        </Section>
+        </div>
+
+        <aside className="space-y-3 lg:sticky lg:top-4 lg:self-start">
+          <GlassCard className="p-4">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-[#ddd6fe]">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              법적 필수 체크리스트
+            </p>
+            <p className="mb-3 text-[11px] text-white/40">
+              {checklistOk}/{legalChecklist.length} 충족
+            </p>
+            <ul className="space-y-1.5">
+              {legalChecklist.map((c) => (
+                <li
+                  key={c.id}
+                  className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] ${
+                    c.ok ? "bg-emerald-500/10 text-emerald-100/90" : "bg-rose-500/10 text-rose-100/90"
+                  }`}
+                >
+                  {c.ok ? <Check className="h-3 w-3 shrink-0" /> : <CircleAlert className="h-3 w-3 shrink-0" />}
+                  {c.label}
+                </li>
+              ))}
+            </ul>
+          </GlassCard>
+        </aside>
       </div>
 
       <div className="fixed bottom-[calc(3.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 border-t border-white/10 bg-[#0B0F19]/92 px-4 py-3 backdrop-blur-md md:bottom-0 md:left-56">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
+        <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-slate-500">
             {isEdit ? (
               <span className="inline-flex items-center gap-1 text-emerald-300">
@@ -656,7 +1049,7 @@ function Section({
   n: number;
   title: string;
   hint?: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <GlassCard className="p-5 md:p-6">
@@ -680,7 +1073,7 @@ function Field({
   className = "",
 }: {
   label: string;
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
 }) {
   return (

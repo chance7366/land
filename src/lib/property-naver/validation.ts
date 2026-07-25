@@ -1,4 +1,10 @@
 import type { PropertyCategory, PropertyType } from "@prisma/client";
+import {
+  mergeComplianceSpecs,
+  parseMaintenanceBreakdown,
+  parseMaintenanceMode,
+  validateMaintenanceBreakdown,
+} from "@/lib/property-maintenance";
 import { getCategoryGroup } from "./categories";
 import { getFieldsForGroup, uniqueFields } from "./field-spec";
 import type { FieldSpec } from "./types";
@@ -44,7 +50,13 @@ export function validatePropertyForm(
     if (field.field_name === "clientName") continue;
 
     const value = field.storage === "specs" ? specs[field.field_name] : merged[field.field_name];
-    if (isEmpty(value) && field.data_type !== "Boolean") {
+    if (field.data_type === "Boolean") {
+      if (field.is_required && typeof value !== "boolean") {
+        return { ok: false, error: `${field.label}을(를) 선택하세요.`, field: field.field_name };
+      }
+      continue;
+    }
+    if (isEmpty(value)) {
       return { ok: false, error: `${field.label}은(는) 필수입니다.`, field: field.field_name };
     }
   }
@@ -106,6 +118,32 @@ export function validatePropertyForm(
     }
   }
 
+  // 비주거: 층수 저/중/고 금지
+  if (group === "RETAIL_OFFICE" || group === "LAND") {
+    if (merged.floorDisplayMode === "BAND" || merged.floorBand) {
+      return {
+        ok: false,
+        error: "상가·비주거·토지는 층수를 저/중/고로 표기할 수 없습니다. 숫자 층수를 입력하세요.",
+        field: "floorDisplayMode",
+      };
+    }
+  }
+
+  const mode = parseMaintenanceMode(merged);
+  const fee = asNumber(body.maintenanceFee);
+  const breakdown = parseMaintenanceBreakdown(merged);
+  const maintErr = validateMaintenanceBreakdown(
+    mode,
+    fee,
+    breakdown,
+    typeof merged.maintenanceBreakdownReason === "string"
+      ? merged.maintenanceBreakdownReason
+      : null,
+  );
+  if (maintErr) {
+    return { ok: false, error: maintErr, field: "maintenanceBreakdown" };
+  }
+
   return { ok: true };
 }
 
@@ -125,7 +163,7 @@ export function collectSpecsFromBody(
       existing[field.field_name] = normalizeSpecValue(field, body[field.field_name]);
     }
   }
-  return existing;
+  return mergeComplianceSpecs(body, existing);
 }
 
 function normalizeSpecValue(field: FieldSpec, value: unknown): unknown {

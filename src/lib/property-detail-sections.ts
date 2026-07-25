@@ -256,6 +256,15 @@ export function buildDetailAreaSection(property: Property): PropertyKvRow[] {
 
   if (property.builtYear) push(items, "건축년도", `${property.builtYear}년`);
   if (property.parking) push(items, "주차", property.parking);
+  if (typeof specs.useApprovalDate === "string" && specs.useApprovalDate) {
+    push(items, "사용승인일", specs.useApprovalDate);
+  }
+  if (specs.actualParking != null) push(items, "실사용 주차", `${specs.actualParking}대`);
+  if (specs.floorDisplayMode === "BAND" && specs.floorBand) {
+    const band =
+      specs.floorBand === "LOW" ? "저층" : specs.floorBand === "MID" ? "중층" : "고층";
+    push(items, "층수 표기", band);
+  }
 
   items.push(...buildFromFields(property, specs, 2));
 
@@ -293,4 +302,98 @@ export function buildPropertyDetailSections(property: Property) {
     detail: buildDetailAreaSection(property),
     facilities: buildFacilitySection(property),
   };
+}
+
+/** 법적 규격 상세 표 (고객 상세) */
+export function buildLegalComplianceRows(property: Property): PropertyKvRow[] {
+  const specs = parseSpecs(property.specs);
+  const group = getCategoryGroup(property.category);
+  const items: PropertyKvRow[] = [];
+  const addr = addressLine(property);
+  const dongFloor = [
+    property.unitDong,
+    specs.floorDisplayMode === "BAND" && specs.floorBand
+      ? specs.floorBand === "LOW"
+        ? "저층"
+        : specs.floorBand === "MID"
+          ? "중층"
+          : specs.floorBand === "HIGH"
+            ? "고층"
+            : null
+      : property.floor != null
+        ? `${property.floor}층`
+        : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  push(items, "소재지", [addr, dongFloor].filter(Boolean).join(" · ") || property.address);
+  if (property.exclusiveArea) {
+    const supply = property.supplyArea
+      ? ` / 공급 ${property.supplyArea}㎡ (전용률 ${Math.round((property.exclusiveArea / property.supplyArea) * 100)}%)`
+      : "";
+    push(items, "전용 / 공급면적", `전용 ${property.exclusiveArea}㎡${supply}`);
+  }
+  push(
+    items,
+    "거래 형태 / 가격",
+    `${propertyCardDealBadgeLabel(property)} / ${
+      property.type === "SALE" || property.type === "PRE_SALE"
+        ? formatManwonWithUnit(property.price)
+        : [
+            property.deposit != null ? formatManwonWithUnit(property.deposit) : null,
+            property.monthlyRent != null ? `월 ${formatManwonWithUnit(property.monthlyRent)}` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")
+    }`,
+  );
+  if (typeof specs.buildingUse === "string") push(items, "건축물 용도", specs.buildingUse);
+  if (group !== "RETAIL_OFFICE" && group !== "LAND" && property.rooms != null) {
+    push(
+      items,
+      "방 수 / 욕실 수",
+      `방 ${property.rooms}개 / 욕실 ${property.bathrooms ?? "-"}개`,
+    );
+  }
+  if (property.direction) {
+    const basis =
+      typeof specs.directionBasis === "string" ? ` (${specs.directionBasis} 기준)` : "";
+    push(items, "방향", `${property.direction}${basis}`);
+  }
+  if (property.floor != null || specs.floorBand) {
+    const floorLine =
+      specs.floorDisplayMode === "BAND" && specs.floorBand
+        ? String(specs.floorBand === "LOW" ? "저층" : specs.floorBand === "MID" ? "중층" : "고층")
+        : property.totalFloors != null
+          ? `${property.floor} / ${property.totalFloors}층`
+          : `${property.floor}층`;
+    push(items, "해당층 / 총층", floorLine);
+  }
+  const totalP = specs.totalParking;
+  const perH = specs.parkingPerHousehold;
+  const actual = specs.actualParking;
+  if (totalP != null || property.parking) {
+    const parts = [
+      totalP != null ? `총 ${totalP}대` : property.parking,
+      perH != null ? `세대당 ${perH}대` : null,
+      actual != null ? `실사용 ${actual}대` : null,
+    ].filter(Boolean);
+    push(items, "총 주차대수", parts.join(", "));
+  }
+  const approve =
+    (typeof specs.useApprovalDate === "string" && specs.useApprovalDate) ||
+    (typeof specs.approvalDate === "string" && specs.approvalDate) ||
+    (property.builtYear ? `${property.builtYear}년` : null);
+  push(items, "승인 일자", approve ? `${approve}${specs.useApprovalDate || specs.approvalDate ? " (사용승인일)" : ""}` : null);
+  const illegal = specs.illegalBuilding === true || specs.illegalBuilding === "true";
+  push(items, "건물 상태", illegal ? "위반건축물" : "정상 건축물 (위반건축물 해당 없음)");
+  if (specs.unregisteredBuilding === true) push(items, "미등기", "미등기");
+  else if (specs.unregisteredConfirmed) push(items, "미등기", "등기 확인");
+  const moveIn =
+    property.moveInType === "지정일" && property.moveInDate
+      ? property.moveInDate
+      : property.moveInType;
+  push(items, "입주 가능일", moveIn);
+  return items;
 }
