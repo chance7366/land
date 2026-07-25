@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  GEMINI_FLASH_MODEL,
   GeminiRequestError,
   generateTodayNewsReportMarkdown,
   getGeminiApiKey,
   resolveAuctionReportModel,
+  type AuctionReportModelId,
 } from "@/lib/gemini-client";
 import { appendGeminiUsage } from "@/lib/gemini-usage";
 import { seoulDateKey } from "@/lib/news-digest-email";
@@ -24,7 +24,7 @@ export const maxDuration = 120;
  */
 export async function POST(request: NextRequest) {
   let dateKey = seoulDateKey();
-  let model = GEMINI_FLASH_MODEL;
+  let model: AuctionReportModelId = resolveAuctionReportModel(undefined);
 
   try {
     const body = (await request.json().catch(() => ({}))) as {
