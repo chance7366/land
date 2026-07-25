@@ -9,12 +9,14 @@ import {
   Bell,
   CalendarDays,
   CircleHelp,
+  Database,
   Gavel,
   LayoutDashboard,
   Newspaper,
   Scale,
   Search,
   Star,
+  TrendingUp,
   User,
   Users,
 } from "lucide-react";
@@ -25,6 +27,8 @@ const NAV = [
   { href: "/admin/customers", label: "고객 관리", Icon: Users },
   { href: "/admin/properties", label: "매물 관리", Icon: Search },
   { href: "/admin/auctions", label: "경매 관리", Icon: Gavel },
+  { href: "/admin/transactions/sync", label: "실거래가 수집", Icon: Database },
+  { href: "/admin/transactions", label: "실거래가 조회", Icon: TrendingUp },
   { href: "/admin/news", label: "부동산 소식", Icon: Newspaper },
   { href: "/admin/subscriptions", label: "맞춤 알림", Icon: Bell },
   { href: "/admin/reviews", label: "성공스토리", Icon: Star },
@@ -75,6 +79,16 @@ function useGeminiToday(pathname: string) {
 function isNavActive(pathname: string, href: string) {
   if (pathname === href) return true;
   if (href === "/admin") return false;
+  // /admin/transactions 가 /admin/transactions/sync 에 매칭되지 않도록
+  if (href === "/admin/transactions") {
+    return (
+      pathname.startsWith("/admin/transactions/") &&
+      !pathname.startsWith("/admin/transactions/sync")
+    );
+  }
+  if (href === "/admin/transactions/sync") {
+    return pathname === href || pathname.startsWith(`${href}/`);
+  }
   // /admin/legal 이 /admin/legal-counsel 에 매칭되지 않도록 경계 검사
   return pathname.startsWith(`${href}/`);
 }

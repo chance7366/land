@@ -30,7 +30,7 @@ export const LEGAL_COUNSEL_SAMPLE_ANSWER = `■ [요약 답변]
 export const LEGAL_COUNSEL_SAMPLE_SOURCES = [
   { kind: "법령", title: "주택임대차보호법 제3조·제3조의2", ref: "국가법령정보센터" },
   { kind: "판례", title: "대법원 2006다62492", ref: "2008. 9. 25. 선고" },
-  { kind: "해석", title: "(목업) 유권해석 슬롯", ref: "Phase 2 연동 예정" },
+  { kind: "해석", title: "(목업) 법령해석례", ref: "Phase 1: law.go.kr expc 실시간 검색" },
 ] as const;
 
 export const LEGAL_COUNSEL_PHASE1_CHECKLIST = [
@@ -58,8 +58,9 @@ export const LEGAL_COUNSEL_PHASE2_TASKS = [
     detail: "감사·비용·재사용을 위한 세션/메시지 DB (관리자만 조회)",
   },
   {
-    title: "국토부 유권해석 OpenAPI",
-    detail: "질의요지·회신 쌍을 RAG에 추가해 행정 적용 기준 보강",
+    title: "해석례 RAG 인덱싱(질의·회답 전문)",
+    detail:
+      "Phase 1의 law.go.kr expc 실시간 검색은 완료. 질의요지·회답 전문을 벡터 RAG에 색인해 국토부 등 행정 적용 기준을 보강",
   },
 ] as const;
 

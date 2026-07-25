@@ -63,6 +63,7 @@ export function getPublicDataServiceKey(): string | undefined {
   const key =
     process.env.PUBLIC_DATA_SERVICE_KEY ||
     process.env.PUBLIC_DATA_API_KEY ||
+    process.env.MOLIT_SERVICE_KEY ||
     process.env.DATA_GO_KR_SERVICE_KEY;
   return key?.trim() || undefined;
 }

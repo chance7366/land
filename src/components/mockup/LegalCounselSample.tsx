@@ -349,7 +349,7 @@ export function LegalCounselSample() {
 
             <div className="mt-4 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-[11px] text-white/40">
               사용자 준비 사항(운영): 국가법령정보센터 OC 키 · Vercel/로컬 env · Gemini 할당량 ·
-              (Phase 2+) 국토부·협회 데이터 활용신청
+              (Phase 2+) 해석례 전문 RAG·협회 FAQ 등 추가 데이터 활용신청
             </div>
           </section>
         </div>
