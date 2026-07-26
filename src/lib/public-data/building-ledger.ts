@@ -394,8 +394,21 @@ export async function fetchBrHsprcItems(codes: ParcelCodes) {
  * (HUB dongNm/hoNm 쿼리는 신뢰할 수 없어 클라이언트 스캔)
  */
 export type BrExposUnitResult =
-  | (BrHubListResult & { matched: BrRow[]; dongCandidates: BrRow[] })
+  | (BrHubListResult & {
+      matched: BrRow[];
+      dongCandidates: BrRow[];
+      /** 1-based page where match was found */
+      matchedPage?: number;
+    })
   | LedgerLookupError;
+
+function hubTotalCount(raw: unknown): number | undefined {
+  const n = Number(
+    (raw as { response?: { body?: { totalCount?: string | number } } })?.response
+      ?.body?.totalCount,
+  );
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
 
 export async function fetchBrExposUnit(
   codes: ParcelCodes,
@@ -407,6 +420,7 @@ export async function fetchBrExposUnit(
   const matched: BrRow[] = [];
   const dongCandidates: BrRow[] = [];
   let lastRaw: unknown;
+  let matchedPage: number | undefined;
   for (let page = 1; page <= maxPages; page++) {
     const result = await fetchBrList(EXPOS_PATH, codes, String(page));
     if (!result.ok) {
@@ -420,7 +434,10 @@ export async function fetchBrExposUnit(
       const dOk = !dong || matchDongLabel(strField(item.dongNm), dong);
       if (!dOk) continue;
       dongCandidates.push(item);
-      if (!ho || matchHoLabel(strField(item.hoNm), ho)) matched.push(item);
+      if (!ho || matchHoLabel(strField(item.hoNm), ho)) {
+        matched.push(item);
+        if (matchedPage == null) matchedPage = page;
+      }
     }
     if (ho && matched.length) break;
     if (result.items.length < 100) break;
@@ -431,20 +448,21 @@ export async function fetchBrExposUnit(
     raw: lastRaw,
     matched,
     dongCandidates,
+    matchedPage,
   };
 }
 
-/** 확정 동·호(또는 관리PK)에 대한 전유공용면적 행 수집 */
+/** 확정 동·호에 대한 전유공용면적 — 힌트 페이지 근처부터 병렬 스캔 */
 export async function fetchBrExposAreaForUnit(
   codes: ParcelCodes,
   dong: string,
   ho: string,
   mgmBldrgstPk?: string,
-  maxPages = 100,
+  hintPage = 1,
 ): Promise<BrHubListResult | LedgerLookupError> {
-  // 1) 관리PK 필터 시도 — 매칭될 때만 채택 (HUB가 PK를 무시하는 경우 있음)
+  // 1) 관리PK 필터 시도 — 매칭될 때만 채택
   if (mgmBldrgstPk) {
-    const byPk = await fetchBrListPaged(EXPOS_AREA_PATH, codes, 5, {
+    const byPk = await fetchBrListPaged(EXPOS_AREA_PATH, codes, 3, {
       mgmBldrgstPk,
     });
     if (byPk.ok && byPk.items.length) {
@@ -459,37 +477,72 @@ export async function fetchBrExposAreaForUnit(
     }
   }
 
+  const first = await fetchBrList(EXPOS_AREA_PATH, codes, "1");
+  if (!first.ok) return first;
+  const total = hubTotalCount(first.raw) ?? first.items.length;
+  const totalPages = Math.min(120, Math.max(1, Math.ceil(total / 100)));
+
+  const isHit = (item: BrRow) =>
+    matchDongLabel(strField(item.dongNm), dong) &&
+    matchHoLabel(strField(item.hoNm), ho);
+
   const rows: BrRow[] = [];
-  let lastRaw: unknown;
-  let found = false;
-  let missAfter = 0;
-  for (let page = 1; page <= maxPages; page++) {
-    const result = await fetchBrList(EXPOS_AREA_PATH, codes, String(page));
-    if (!result.ok) {
-      if (page === 1) return result;
-      break;
-    }
-    lastRaw = result.raw;
-    if (!result.items.length) break;
-    let pageHits = 0;
-    for (const item of result.items) {
-      if (
-        matchDongLabel(strField(item.dongNm), dong) &&
-        matchHoLabel(strField(item.hoNm), ho)
-      ) {
-        rows.push(item);
-        pageHits++;
+  let lastRaw: unknown = first.raw;
+  for (const item of first.items) {
+    if (isHit(item)) rows.push(item);
+  }
+  if (rows.length && totalPages === 1) {
+    return { ok: true, items: rows, raw: lastRaw };
+  }
+
+  // 전유부 페이지 × 대략 면적행 배수(5~7) 근처부터 탐색
+  const center = Math.min(
+    totalPages,
+    Math.max(1, Math.round((hintPage || 1) * 5.5)),
+  );
+  const order: number[] = [];
+  const seen = new Set<number>();
+  const push = (p: number) => {
+    if (p < 1 || p > totalPages || seen.has(p) || p === 1) return;
+    seen.add(p);
+    order.push(p);
+  };
+  push(center);
+  for (let d = 1; d < totalPages; d++) {
+    push(center - d);
+    push(center + d);
+  }
+
+  const CONCURRENCY = 8;
+  let found = rows.length > 0;
+  let emptyBatchesAfter = 0;
+  for (let i = 0; i < order.length; i += CONCURRENCY) {
+    const batch = order.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(
+      batch.map((p) => fetchBrList(EXPOS_AREA_PATH, codes, String(p))),
+    );
+    let batchHits = 0;
+    for (const result of results) {
+      if (!result.ok) continue;
+      lastRaw = result.raw;
+      for (const item of result.items) {
+        if (isHit(item)) {
+          rows.push(item);
+          batchHits++;
+        }
       }
     }
-    if (pageHits > 0) {
+    if (batchHits > 0) {
       found = true;
-      missAfter = 0;
+      emptyBatchesAfter = 0;
     } else if (found) {
-      missAfter++;
-      if (missAfter >= 3) break;
+      emptyBatchesAfter++;
+      // 연속 빈 배치면 해당 호 블록을 지난 것으로 보고 종료
+      if (emptyBatchesAfter >= 2) break;
     }
-    if (result.items.length < 100) break;
+    if (rows.length >= 20) break;
   }
+
   return { ok: true, items: rows, raw: lastRaw };
 }
 
@@ -543,7 +596,7 @@ export async function fetchBrBasisItems(codes: ParcelCodes) {
 }
 
 export async function fetchBrFlrItems(codes: ParcelCodes, paged = true) {
-  return paged ? fetchBrListPaged(FLR_PATH, codes, 10) : fetchBrList(FLR_PATH, codes);
+  return paged ? fetchBrListPaged(FLR_PATH, codes, 5) : fetchBrList(FLR_PATH, codes);
 }
 
 export async function fetchBrJijiguItems(codes: ParcelCodes) {

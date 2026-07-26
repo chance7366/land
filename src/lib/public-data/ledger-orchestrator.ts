@@ -236,8 +236,17 @@ export async function lookupLedgerBundle(
   let expos: BuildingLedgerFields | undefined;
   let candidates: LedgerCandidate[] = [];
 
-  // 기본개요 (보조)
-  const basisRes = await fetchBrBasisItems(codes);
+  // 표제·총괄·기본개요·층별·지역지구 병렬 조회
+  const [basisRes, recapRes, titleRes, flrRes, jijiguRes] = await Promise.all([
+    fetchBrBasisItems(codes),
+    input.ledgerKind === "AGGREGATE"
+      ? fetchBrRecapItems(codes)
+      : Promise.resolve({ ok: true as const, items: [], raw: null }),
+    fetchBrTitleItems(codes),
+    fetchBrFlrItems(codes, true),
+    fetchBrJijiguItems(codes),
+  ]);
+
   if (basisRes.ok && basisRes.items.length > 0) {
     basis = mapBrItem(basisRes.items[0], "basis");
     rawSnapshots.push({ kind: "basis", raw: basisRes.raw });
@@ -246,18 +255,14 @@ export async function lookupLedgerBundle(
     warnings.push(`기본개요: ${basisRes.error}`);
   }
 
-  if (input.ledgerKind === "AGGREGATE") {
-    const recapRes = await fetchBrRecapItems(codes);
-    if (recapRes.ok && recapRes.items.length > 0) {
-      recap = mapBrItem(recapRes.items[0], "recap");
-      rawSnapshots.push({ kind: "recap", raw: recapRes.raw });
-      summaryParts.push(`총괄표제부 ${recapRes.items.length}건`);
-    } else if (!recapRes.ok) {
-      warnings.push(`총괄표제부: ${recapRes.error}`);
-    }
+  if (recapRes.ok && recapRes.items.length > 0) {
+    recap = mapBrItem(recapRes.items[0], "recap");
+    rawSnapshots.push({ kind: "recap", raw: recapRes.raw });
+    summaryParts.push(`총괄표제부 ${recapRes.items.length}건`);
+  } else if (!recapRes.ok && "error" in recapRes) {
+    warnings.push(`총괄표제부: ${recapRes.error}`);
   }
 
-  const titleRes = await fetchBrTitleItems(codes);
   if (!titleRes.ok) {
     if (input.ledgerKind === "GENERAL") return titleRes;
     warnings.push(`표제부: ${titleRes.error}`);
@@ -311,9 +316,6 @@ export async function lookupLedgerBundle(
     if (picked) title = mapBrItem(picked, "title");
   }
 
-  // 층별개요·지역지구 (동/단지 보강 — 전유 확정 후에도 합성에 포함)
-  const flrRes = await fetchBrFlrItems(codes, true);
-  const jijiguRes = await fetchBrJijiguItems(codes);
   let floorRows = flrRes.ok
     ? mapFloorRows(flrRes.items, dong || title?.dongNm)
     : [];
@@ -398,12 +400,11 @@ export async function lookupLedgerBundle(
         const unitHo = String(e.hoNm ?? ho ?? "");
 
         const unitPk = expos.mgmBldrgstPk;
-        const areaRes = await fetchBrExposAreaForUnit(
-          codes,
-          unitDong,
-          unitHo,
-          unitPk,
-        );
+        const hintPage = exposRes.matchedPage ?? 1;
+        const [areaRes, hsprcRes] = await Promise.all([
+          fetchBrExposAreaForUnit(codes, unitDong, unitHo, unitPk, hintPage),
+          fetchBrHsprcForUnit(codes, unitDong, unitHo, unitPk),
+        ]);
         if (areaRes.ok) {
           const areas = aggregateExposAreas(areaRes.items, unitDong, unitHo);
           if (areas.exclusiveArea != null) expos.exclusiveArea = areas.exclusiveArea;
@@ -433,12 +434,6 @@ export async function lookupLedgerBundle(
           warnings.push(`전유공용면적: ${areaRes.error}`);
         }
 
-        const hsprcRes = await fetchBrHsprcForUnit(
-          codes,
-          unitDong,
-          unitHo,
-          unitPk,
-        );
         if (hsprcRes.ok) {
           rawSnapshots.push({ kind: "hsprc", raw: hsprcRes.raw });
           if (hsprcRes.items[0]) {
