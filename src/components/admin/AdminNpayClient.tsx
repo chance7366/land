@@ -78,9 +78,9 @@ function formatManFromWon(v: number): string {
 
 export function AdminNpayClient() {
   const [tab, setTab] = useState<TabId>("articles");
-  const [city, setCity] = useState(NPAY_DEFAULT_REGION.city);
-  const [division, setDivision] = useState(NPAY_DEFAULT_REGION.division);
-  const [sector, setSector] = useState(NPAY_DEFAULT_REGION.sector);
+  const [city, setCity] = useState<string>(NPAY_DEFAULT_REGION.city);
+  const [division, setDivision] = useState<string>(NPAY_DEFAULT_REGION.division);
+  const [sector, setSector] = useState<string>(NPAY_DEFAULT_REGION.sector);
   const [estates, setEstates] =
     useState<NpayEstateType[]>(ALL_NPAY_ESTATE_CODES);
   const [trades, setTrades] = useState<NpayTradeType[]>([
