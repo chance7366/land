@@ -226,7 +226,11 @@ function triggerDownload(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-export function AdminTransactionsBrowseClient() {
+export function AdminTransactionsBrowseClient({
+  embedded = false,
+}: {
+  embedded?: boolean;
+} = {}) {
   const [propertyType, setPropertyType] = useState<TxPropertyType>("APT");
   const [dealType, setDealType] = useState<TxDealType>("SALE");
   const [startYm, setStartYm] = useState("2026-01");
@@ -353,43 +357,57 @@ export function AdminTransactionsBrowseClient() {
     );
   }
 
+  const downloadBtns = (
+    <div className="flex flex-wrap gap-2">
+      <button
+        type="button"
+        onClick={downloadCsv}
+        disabled={filtered.length === 0}
+        className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-white/10 disabled:opacity-40"
+      >
+        <Download className="h-3.5 w-3.5" aria-hidden />
+        CSV
+      </button>
+      <button
+        type="button"
+        onClick={downloadExcel}
+        disabled={filtered.length === 0}
+        className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-100 hover:bg-emerald-500/20 disabled:opacity-40"
+      >
+        <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden />
+        Excel
+      </button>
+    </div>
+  );
+
   return (
-    <main className="space-y-5 p-6 md:p-10">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-[#c4b5fd]">
-            Browse · Analytics
-          </p>
-          <h1 className="mt-1 flex items-center gap-2 text-2xl font-extrabold text-landing-text">
-            <TrendingUp className="h-7 w-7 text-blue-400" aria-hidden />
-            실거래가 조회
-          </h1>
-          <p className="mt-1 text-sm text-landing-muted">
+    <div className={embedded ? "space-y-5" : "space-y-5 p-6 md:p-10"}>
+      {!embedded ? (
+        <header className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#c4b5fd]">
+              Browse · Analytics
+            </p>
+            <h1 className="mt-1 flex items-center gap-2 text-2xl font-extrabold text-landing-text">
+              <TrendingUp className="h-7 w-7 text-blue-400" aria-hidden />
+              실거래가 조회
+            </h1>
+            <p className="mt-1 text-sm text-landing-muted">
+              Supabase에 저장된 실거래를 필터·KPI로 조회합니다. 상세 컬럼은 부동산
+              종류·거래유형에 따라 달라집니다.
+            </p>
+          </div>
+          {downloadBtns}
+        </header>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-landing-muted">
             Supabase에 저장된 실거래를 필터·KPI로 조회합니다. 상세 컬럼은 부동산
             종류·거래유형에 따라 달라집니다.
           </p>
+          {downloadBtns}
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={downloadCsv}
-            disabled={filtered.length === 0}
-            className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-white/10 disabled:opacity-40"
-          >
-            <Download className="h-3.5 w-3.5" aria-hidden />
-            CSV
-          </button>
-          <button
-            type="button"
-            onClick={downloadExcel}
-            disabled={filtered.length === 0}
-            className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-100 hover:bg-emerald-500/20 disabled:opacity-40"
-          >
-            <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden />
-            Excel
-          </button>
-        </div>
-      </header>
+      )}
 
       {error ? (
         <GlassCard className="border-rose-400/30 bg-rose-500/10 p-3 text-sm text-rose-100">
@@ -565,6 +583,6 @@ export function AdminTransactionsBrowseClient() {
           </table>
         </DataTable>
       </GlassCard>
-    </main>
+    </div>
   );
 }

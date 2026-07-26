@@ -72,6 +72,9 @@ import {
 import { CaseDetailSection } from "@/components/auction/CaseDetailSection";
 import { BasicPropertyInfoPanel } from "@/components/auction/BasicPropertyInfoPanel";
 import { ListDetailsPanel } from "@/components/auction/ListDetailsPanel";
+import { PropertyLedgerLookupPanel } from "@/components/admin/PropertyLedgerLookupPanel";
+import { ledgerKindFromAuctionHints } from "@/lib/public-data/ledger-kind";
+import type { BuildingLedgerFields, LandLedgerFields } from "@/lib/public-data/types";
 import {
   caseDetailFromRights,
   cloneCaseDetail,
@@ -600,6 +603,7 @@ function buildRightsAnalysis(
   docSlots?: DocSlotState[],
   bidNotes?: BiddingValuationNotes,
   locNotes?: LocationAnalysisNotes,
+  ledgerNote?: string,
 ): string {
   const scheduleLines = schedule
     .map(
@@ -622,6 +626,7 @@ function buildRightsAnalysis(
     form.assumeRightsNote ? `[매수인 인수 권리] ${form.assumeRightsNote}` : "",
     form.saleShare ? `[매각지분] ${form.saleShare}` : "",
     form.remarks.trim() ? `[물건비고]\n${form.remarks.trim()}` : "",
+    ledgerNote?.trim() ? ledgerNote.trim() : "",
     schedule.length ? `[기일내역JSON]\n${JSON.stringify(schedule)}` : "",
     scheduleLines ? `[기일내역]\n${scheduleLines}` : "",
     form.landShareDenom && form.landShareNumer
@@ -646,6 +651,22 @@ function buildRightsAnalysis(
     hasMeta ? `[등록메타JSON]\n${JSON.stringify(meta)}` : "",
   ].filter(Boolean);
   return lines.join("\n\n");
+}
+
+function ledgerNoteFromRights(text: string): string {
+  const building = sectionFromRights(text, "건축물대장");
+  const land = sectionFromRights(text, "토지특성");
+  return [building ? `[건축물대장]\n${building}` : "", land ? `[토지특성]\n${land}` : ""]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function upsertLedgerSection(prev: string, tag: "건축물대장" | "토지특성", body: string): string {
+  const block = `[${tag}]\n${body}`;
+  if (!prev.trim()) return block;
+  const re = new RegExp(`\\[${tag}\\][\\s\\S]*?(?=\\n\\[|$)`);
+  if (re.test(prev)) return prev.replace(re, block).trim();
+  return `${prev.trim()}\n\n${block}`;
 }
 
 function loadCaseDetail(auction?: Auction): CaseDetail {
@@ -752,6 +773,9 @@ export function AuctionForm({ initial }: AuctionFormProps) {
   );
   const [locNotes, setLocNotes] = useState<LocationAnalysisNotes>(() =>
     locNotesFromRights(initial?.rightsAnalysis ?? ""),
+  );
+  const [ledgerNote, setLedgerNote] = useState(() =>
+    ledgerNoteFromRights(initial?.rightsAnalysis ?? ""),
   );
   const [images, setImages] = useState<string[]>(() => parseImages(initial?.images || "[]"));
   const [attachments, setAttachments] = useState<AuctionAttachment[]>(() =>
@@ -1334,6 +1358,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
         docSlots,
         bidNotes,
         locNotes,
+        ledgerNote,
       ),
       caseDetailJson: caseDetail.available
         ? JSON.stringify(
@@ -1751,6 +1776,106 @@ export function AuctionForm({ initial }: AuctionFormProps) {
         </Section>
 
         <CaseDetailSection n={5} data={caseDetail} hideLists>
+          <div className="mb-4">
+            <PropertyLedgerLookupPanel
+              addressParts={{}}
+              addressOverride={[form.address, form.address2].filter(Boolean).join(" ")}
+              defaultLedgerKind={ledgerKindFromAuctionHints({
+                itemType: form.itemType,
+                auctionTarget: form.auctionTarget,
+                landArea: form.landArea ? Number(form.landArea) : null,
+                buildingArea: form.buildingArea
+                  ? Number(form.buildingArea)
+                  : form.exclusiveArea
+                    ? Number(form.exclusiveArea)
+                    : null,
+              })}
+              persistOwner={
+                initial?.id ? { type: "auction", id: initial.id } : undefined
+              }
+              onApplyBuilding={(fields: BuildingLedgerFields) => {
+                setForm((prev) => {
+                  const next = { ...prev };
+                  if (fields.exclusiveArea != null) {
+                    next.exclusiveArea = String(fields.exclusiveArea);
+                    if (prev.formGroup === "UNIT" || !prev.formGroup) {
+                      next.buildingArea = String(fields.exclusiveArea);
+                    }
+                  }
+                  if (fields.supplyArea != null && prev.formGroup !== "UNIT") {
+                    next.buildingArea = String(fields.supplyArea);
+                  }
+                  if (fields.totalFloorArea != null && prev.formGroup === "HOUSE") {
+                    next.buildingArea = String(fields.totalFloorArea);
+                  }
+                  if (fields.landShareArea != null && !next.landArea) {
+                    next.landArea = String(fields.landShareArea);
+                  }
+                  return next;
+                });
+                const lines = [
+                  fields.dongNm || fields.hoNm
+                    ? `동호: ${[fields.dongNm, fields.hoNm].filter(Boolean).join(" ")}`
+                    : "",
+                  fields.floorNm || fields.floor != null
+                    ? `층: ${[fields.flrGbNm, fields.floorNm || fields.floor].filter(Boolean).join(" ")}`
+                    : "",
+                  fields.exclusiveArea != null ? `전유: ${fields.exclusiveArea}㎡` : "",
+                  fields.commonArea != null ? `공용: ${fields.commonArea}㎡` : "",
+                  fields.supplyArea != null ? `공급: ${fields.supplyArea}㎡` : "",
+                  fields.buildingUse ? `주용도: ${fields.buildingUse}` : "",
+                  fields.etcPurps ? `기타용도: ${fields.etcPurps}` : "",
+                  fields.structureType ? `구조: ${fields.structureType}` : "",
+                  fields.housePrice != null
+                    ? `주택가격: ${fields.housePrice}${fields.housePriceStdDay ? ` (${fields.housePriceStdDay})` : ""}`
+                    : "",
+                  fields.useApprovalDate ? `사용승인: ${fields.useApprovalDate}` : "",
+                  fields.totalParking != null ? `주차: ${fields.totalParking}` : "",
+                  fields.jijiguRows?.length
+                    ? `지역지구: ${fields.jijiguRows
+                        .map((j) => j.cdNm || j.etcNm)
+                        .filter(Boolean)
+                        .slice(0, 4)
+                        .join(", ")}`
+                    : "",
+                  fields.exposAreaRows?.length
+                    ? `전유공용면적: ${fields.exposAreaRows
+                        .map((r) => `${r.exposPubuseGb || "?"}${r.area ?? ""}`)
+                        .join(" / ")}`
+                    : "",
+                  fields.mgmBldrgstPk ? `관리PK: ${fields.mgmBldrgstPk}` : "",
+                ].filter(Boolean);
+                if (lines.length) {
+                  setLedgerNote((prev) => upsertLedgerSection(prev, "건축물대장", lines.join("\n")));
+                }
+              }}
+              onApplyLand={(fields: LandLedgerFields) => {
+                setForm((prev) => {
+                  const next = { ...prev };
+                  if (fields.exclusiveArea != null) {
+                    next.landArea = String(fields.exclusiveArea);
+                  }
+                  return next;
+                });
+                const lines = [
+                  fields.pnu ? `PNU: ${fields.pnu}` : "",
+                  fields.landCategory ? `지목: ${fields.landCategory}` : "",
+                  fields.zoning ? `용도지역: ${fields.zoning}` : "",
+                  fields.zoning2 ? `용도지역2: ${fields.zoning2}` : "",
+                  fields.landUseStatus ? `이용상황: ${fields.landUseStatus}` : "",
+                  fields.terrain ? `지형: ${fields.terrain}` : "",
+                  fields.landShape ? `형상: ${fields.landShape}` : "",
+                  fields.roadAccess ? `도로접면: ${fields.roadAccess}` : "",
+                  fields.officialLandPrice != null
+                    ? `공시지가: ${fields.officialLandPrice}${fields.priceStdYear ? ` (${fields.priceStdYear})` : ""}`
+                    : "",
+                ].filter(Boolean);
+                if (lines.length) {
+                  setLedgerNote((prev) => upsertLedgerSection(prev, "토지특성", lines.join("\n")));
+                }
+              }}
+            />
+          </div>
           {form.formGroup === "UNIT" && (
             <div className="grid gap-3 md:grid-cols-3">
               <Field label="전유면적 (㎡)">
@@ -2460,6 +2585,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
                   setDocSlots(docSlotsFromRights(initial.rightsAnalysis ?? ""));
                   setBidNotes(bidNotesFromRights(initial.rightsAnalysis ?? ""));
                   setLocNotes(locNotesFromRights(initial.rightsAnalysis ?? ""));
+                  setLedgerNote(ledgerNoteFromRights(initial.rightsAnalysis ?? ""));
                   setMemberReportUrl(initial.reportUrl?.trim() || null);
                   setGeneralReportUrl(
                     (initial as { generalReportUrl?: string | null }).generalReportUrl?.trim() ||
@@ -2480,6 +2606,7 @@ export function AuctionForm({ initial }: AuctionFormProps) {
                   setDocSlots(emptyDocSlots());
                   setBidNotes(emptyBiddingValuationNotes());
                   setLocNotes(emptyLocationAnalysisNotes());
+                  setLedgerNote("");
                   setMemberReportUrl(null);
                   setGeneralReportUrl(null);
                   setAutoKeys(new Set());

@@ -196,7 +196,11 @@ function mapCoverage(rows: CoverageApiRow[]): CoverageCell[] {
   }));
 }
 
-export function AdminTransactionsCollectClient() {
+export function AdminTransactionsCollectClient({
+  embedded = false,
+}: {
+  embedded?: boolean;
+} = {}) {
   const [startYm, setStartYm] = useState("2026-01");
   const [endYm, setEndYm] = useState("2026-06");
   const [sido, setSido] = useState("충청남도");
@@ -418,19 +422,25 @@ export function AdminTransactionsCollectClient() {
   }
 
   return (
-    <main className="space-y-5 p-6 md:p-10">
-      <header>
-        <p className="text-xs font-semibold uppercase tracking-wider text-[#c4b5fd]">
-          Collect · Coverage
-        </p>
-        <h1 className="mt-1 flex items-center gap-2 text-2xl font-extrabold text-landing-text">
-          <Database className="h-7 w-7 text-blue-400" aria-hidden />
-          실거래가 수집
-        </h1>
-        <p className="mt-1 text-sm text-landing-muted">
+    <div className={embedded ? "space-y-5" : "space-y-5 p-6 md:p-10"}>
+      {!embedded ? (
+        <header>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#c4b5fd]">
+            Collect · Coverage
+          </p>
+          <h1 className="mt-1 flex items-center gap-2 text-2xl font-extrabold text-landing-text">
+            <Database className="h-7 w-7 text-blue-400" aria-hidden />
+            실거래가 수집
+          </h1>
+          <p className="mt-1 text-sm text-landing-muted">
+            지역·종류·거래유형·연월별 수집 현황을 보고, 미수집 기간만 추가 수집합니다.
+          </p>
+        </header>
+      ) : (
+        <p className="text-sm text-landing-muted">
           지역·종류·거래유형·연월별 수집 현황을 보고, 미수집 기간만 추가 수집합니다.
         </p>
-      </header>
+      )}
 
       {error ? (
         <GlassCard className="border-rose-400/30 bg-rose-500/10 p-3 text-sm text-rose-100">
@@ -717,6 +727,6 @@ export function AdminTransactionsCollectClient() {
           </table>
         </DataTable>
       </GlassCard>
-    </main>
+    </div>
   );
 }

@@ -252,7 +252,7 @@ export function AdminNpayClient() {
   return (
     <div className="space-y-4">
       <header className="space-y-1">
-        <h1 className="text-xl font-bold text-landing-text">Npay매물수집</h1>
+        <h1 className="text-xl font-bold text-landing-text">Npay매물</h1>
         <p className="text-sm text-landing-muted">
           fin.land.naver.com · 탭으로 매물/단지 · DB 없이 파일 저장
         </p>

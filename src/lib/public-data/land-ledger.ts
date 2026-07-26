@@ -9,35 +9,59 @@ import type {
 const LAND_CHAR_URL = "https://api.vworld.kr/ned/data/getLandCharacteristics";
 const ADDRESS_URL = "https://api.vworld.kr/req/address";
 
-type LandCharItem = {
-  pnu?: string;
-  lndcgrCodeNm?: string;
-  lndpclAr?: string | number;
-  prposArea1Nm?: string;
-  prposArea2Nm?: string;
-  ladUseSittnNm?: string;
-  tpgrphHgCodeNm?: string;
-  tpgrphFrmCodeNm?: string;
-  roadSideCodeNm?: string;
-  pblntfPclnd?: string | number;
-};
+type LandCharItem = Record<string, unknown>;
 
 export function getVworldApiKey(): string | undefined {
   const key = process.env.VWORLD_API_KEY || process.env.VWORLD_KEY;
   return key?.trim() || undefined;
 }
 
-function mapLandItem(item: LandCharItem): LandLedgerFields {
+function str(raw: unknown): string | undefined {
+  if (raw == null || raw === "") return undefined;
+  const s = String(raw).trim();
+  return s || undefined;
+}
+
+function mapLandItem(item: LandCharItem, stdrYear?: string): LandLedgerFields {
+  const known = new Set([
+    "pnu",
+    "lndcgrCode",
+    "lndcgrCodeNm",
+    "lndpclAr",
+    "prposArea1",
+    "prposArea1Nm",
+    "prposArea2",
+    "prposArea2Nm",
+    "ladUseSittnNm",
+    "tpgrphHgCodeNm",
+    "tpgrphFrmCodeNm",
+    "roadSideCodeNm",
+    "pblntfPclnd",
+    "ldCodeNm",
+    "addr",
+  ]);
+  const extras: Record<string, string | number> = {};
+  for (const [k, v] of Object.entries(item)) {
+    if (known.has(k) || v == null || v === "" || typeof v === "object") continue;
+    const n = toNumber(v);
+    extras[k] = n != null && String(v).replace(/[,\s]/g, "") === String(n) ? n : String(v);
+  }
+
   return {
-    pnu: item.pnu,
+    pnu: str(item.pnu),
     exclusiveArea: toNumber(item.lndpclAr),
-    landCategory: item.lndcgrCodeNm?.trim() || undefined,
-    zoning: item.prposArea1Nm?.trim() || item.prposArea2Nm?.trim() || undefined,
-    landUseStatus: item.ladUseSittnNm?.trim() || undefined,
-    terrain: item.tpgrphHgCodeNm?.trim() || undefined,
-    landShape: item.tpgrphFrmCodeNm?.trim() || undefined,
-    roadAccess: item.roadSideCodeNm?.trim() || undefined,
+    landCategory: str(item.lndcgrCodeNm),
+    landCategoryCode: str(item.lndcgrCode),
+    zoning: str(item.prposArea1Nm) || str(item.prposArea2Nm),
+    zoning2: str(item.prposArea2Nm),
+    landUseStatus: str(item.ladUseSittnNm),
+    terrain: str(item.tpgrphHgCodeNm),
+    landShape: str(item.tpgrphFrmCodeNm),
+    roadAccess: str(item.roadSideCodeNm),
     officialLandPrice: toNumber(item.pblntfPclnd),
+    priceStdYear: stdrYear,
+    platPlc: str(item.addr) || str(item.ldCodeNm),
+    extras: Object.keys(extras).length ? extras : undefined,
   };
 }
 
@@ -95,7 +119,6 @@ export async function resolvePnuFromAddress(
       };
     }
 
-    // PNU는 result에 직접 없거나 별도 필드에 있을 수 있어, 여러 경로를 탐색
     const raw = JSON.stringify(json.response ?? {});
     const pnuMatch = raw.match(/\b(\d{19})\b/);
     if (!pnuMatch) {
@@ -178,8 +201,6 @@ export async function fetchLandLedger(input: {
         landCharacteristicss?: {
           field?: LandCharItem | LandCharItem[];
         };
-        dens?: unknown;
-        result?: unknown;
       };
 
       const field = json.landCharacteristicss?.field;
@@ -193,7 +214,7 @@ export async function fetchLandLedger(input: {
         continue;
       }
 
-      const fields = mapLandItem(list[0]);
+      const fields = mapLandItem(list[0], stdrYear);
       const codes = parsePnu(pnu);
 
       return {

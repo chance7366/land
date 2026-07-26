@@ -6,14 +6,28 @@ function pad4(n: string | number): string {
   return digits.slice(-4).padStart(4, "0");
 }
 
-/** PNU(19) → 시군구·법정동·대지·본번·부번 */
+/**
+ * PNU 11번째(토지구분): 1=일반, 2=산
+ * 건축물대장 platGbCd: 0=대지, 1=산, 2=블록
+ */
+export function pnuLandCatToPlatGb(landCat: string): string {
+  if (landCat === "2") return "1";
+  return "0"; // 1(일반) 및 기타 → 대지
+}
+
+export function platGbToPnuLandCat(platGbCd: string): string {
+  if (platGbCd === "1") return "2";
+  return "1"; // 0(대지)·2(블록) → PNU 일반
+}
+
+/** PNU(19) → 시군구·법정동·대지(API)·본번·부번 */
 export function parsePnu(pnuRaw: string): ParcelCodes | null {
   const pnu = String(pnuRaw || "").replace(/\D/g, "");
   if (pnu.length !== 19) return null;
   return {
     sigunguCd: pnu.slice(0, 5),
     bjdongCd: pnu.slice(5, 10),
-    platGbCd: pnu.slice(10, 11),
+    platGbCd: pnuLandCatToPlatGb(pnu.slice(10, 11)),
     bun: pnu.slice(11, 15),
     ji: pnu.slice(15, 19),
     pnu,
@@ -21,7 +35,8 @@ export function parsePnu(pnuRaw: string): ParcelCodes | null {
 }
 
 export function buildPnu(codes: Omit<ParcelCodes, "pnu">): string {
-  return `${codes.sigunguCd}${codes.bjdongCd}${codes.platGbCd}${pad4(codes.bun)}${pad4(codes.ji)}`;
+  const landCat = platGbToPnuLandCat(codes.platGbCd);
+  return `${codes.sigunguCd}${codes.bjdongCd}${landCat}${pad4(codes.bun)}${pad4(codes.ji)}`;
 }
 
 export function normalizeParcelCodes(input: {

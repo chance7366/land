@@ -41,6 +41,7 @@ import {
   type FormStep,
 } from "@/lib/property-naver";
 import { PropertyLedgerLookupPanel } from "@/components/admin/PropertyLedgerLookupPanel";
+import { ledgerKindFromPropertyCategory } from "@/lib/public-data/ledger-kind";
 import type { BuildingLedgerFields, LandLedgerFields } from "@/lib/public-data/types";
 
 const MAX_IMAGES = 5;
@@ -348,22 +349,65 @@ export function PropertyForm({ initial }: PropertyFormProps) {
         if (value === undefined || value === "") return;
         next[key] = value;
       };
+      // 전유부 핵심 우선
+      if (fields.dongNm) assign("unitDong", String(fields.dongNm).replace(/동$/i, ""));
+      if (fields.hoNm) assign("unitHo", String(fields.hoNm).replace(/호$/i, ""));
+      if (fields.floor != null) assign("floor", fields.floor);
+      if (fields.exclusiveArea != null) next.exclusiveArea = fields.exclusiveArea;
+      if (fields.supplyArea != null) assign("supplyArea", fields.supplyArea);
+      if (fields.commonArea != null) assign("commonArea", fields.commonArea);
+      if (fields.housePrice != null) assign("housePrice", fields.housePrice);
+      if (fields.etcPurps) assign("etcPurps", fields.etcPurps);
+
       assign("buildingName", fields.buildingName);
-      assign("buildingUse", fields.buildingUse);
+      assign("buildingUse", fields.buildingUse || fields.etcPurps);
       assign("totalFloorArea", fields.totalFloorArea);
+      assign("archArea", fields.archArea);
       assign("landShareArea", fields.landShareArea);
       assign("totalFloors", fields.totalFloors);
+      assign("undergroundFloors", fields.undergroundFloors);
       assign("useApprovalDate", fields.useApprovalDate);
       assign("approvalDate", fields.approvalDate);
+      assign("permitDate", fields.permitDate);
+      assign("startConstructDate", fields.startConstructDate);
       assign("totalParking", fields.totalParking);
-      assign("structureType", fields.structureType);
-      // 집합건물은 전유면적이 표제부 연면적과 다를 수 있음 → 비어 있을 때만 채움
-      if (
-        (prev.exclusiveArea == null || prev.exclusiveArea === "") &&
-        fields.exclusiveArea != null
-      ) {
-        next.exclusiveArea = fields.exclusiveArea;
+      assign("indoorParking", fields.indoorParking);
+      assign("outdoorParking", fields.outdoorParking);
+      assign("structureType", fields.structureType || fields.etcStrct);
+      assign("bcRat", fields.bcRat);
+      assign("vlRat", fields.vlRat);
+      assign("vlRatEstmTotArea", fields.vlRatEstmTotArea);
+      assign("height", fields.height);
+      assign("elevatorCnt", fields.elevatorCnt);
+      assign("emergElevatorCnt", fields.emergElevatorCnt);
+      assign("seismicDesign", fields.seismicDesign);
+      assign("energyGrade", fields.energyGrade);
+      assign("ecoBldGrade", fields.ecoBldGrade);
+      assign("hhldCnt", fields.hhldCnt);
+      assign("roadAddress", fields.roadAddress);
+      assign("platPlc", fields.platPlc);
+      if (fields.totalParking != null) {
+        next.parking = String(fields.totalParking);
       }
+      // 전유공용·층별·지역지구 등 상세는 specs에 보존
+      next.ledgerExposDetail = {
+        exposAreaRows: fields.exposAreaRows,
+        floorRows: fields.floorRows,
+        jijiguRows: fields.jijiguRows,
+        extras: fields.extras,
+        housePrice: fields.housePrice,
+        housePriceStdDay: fields.housePriceStdDay,
+        mgmBldrgstPk: fields.mgmBldrgstPk,
+        flrGbNm: fields.flrGbNm,
+        floorNm: fields.floorNm,
+        commonArea: fields.commonArea,
+        supplyArea: fields.supplyArea,
+        exclusiveArea: fields.exclusiveArea,
+        etcStrct: fields.etcStrct,
+        mainAtchGbCdNm: fields.mainAtchGbCdNm,
+        regstrKindCdNm: fields.regstrKindCdNm,
+        crtnDay: fields.crtnDay,
+      };
       return next;
     });
   }
@@ -670,6 +714,12 @@ export function PropertyForm({ initial }: PropertyFormProps) {
                     jibunMain: form.jibunMain as string | number | undefined,
                     jibunSub: form.jibunSub as string | number | undefined,
                   }}
+                  unitDong={String(form.unitDong || "")}
+                  unitHo={String(form.unitHo || "")}
+                  defaultLedgerKind={ledgerKindFromPropertyCategory(category)}
+                  persistOwner={
+                    initial?.id ? { type: "property", id: initial.id } : undefined
+                  }
                   onApplyBuilding={applyBuildingLedger}
                   onApplyLand={applyLandLedger}
                 />
