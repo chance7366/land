@@ -13,7 +13,7 @@ import {
   mapJijiguRows,
 } from "./building-ledger";
 import { fetchLandLedger, resolvePnuFromAddress } from "./land-ledger";
-import { matchDongLabel, matchHoLabel, normalizeDongHo } from "./ledger-kind";
+import { matchDongLabel, normalizeDongHo } from "./ledger-kind";
 import { normalizeParcelCodes, parsePnu } from "./parcel";
 import type {
   BuildingLedgerFields,
@@ -327,7 +327,7 @@ export async function lookupLedgerBundle(
     warnings.push(`층별개요: ${flrRes.error}`);
   }
 
-  let jijiguRows = jijiguRes.ok ? mapJijiguRows(jijiguRes.items) : [];
+  const jijiguRows = jijiguRes.ok ? mapJijiguRows(jijiguRes.items) : [];
   if (jijiguRes.ok) {
     rawSnapshots.push({ kind: "jijigu", raw: jijiguRes.raw });
     summaryParts.push(`지역지구 ${jijiguRes.items.length}건`);
