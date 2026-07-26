@@ -23,7 +23,6 @@ export async function launchAppBrowser(
     ]);
     const chromium = chromiumMod.default;
     try {
-      // 일부 버전에서 setGraphicsMode 시그니처가 달라 런타임 호출만 사용
       (chromium as unknown as { setGraphicsMode?: (v: boolean) => void }).setGraphicsMode?.(
         false,
       );
@@ -44,8 +43,10 @@ export async function launchAppBrowser(
   }
 
   const { chromium } = await import("playwright");
-  return chromium.launch({
+  const browser = await chromium.launch({
     headless: true,
     args: ["--disable-dev-shm-usage", "--no-sandbox", ...extraArgs],
   });
+  // playwright / playwright-core 중첩 버전 타입 차이 흡수
+  return browser as unknown as Browser;
 }
