@@ -3,7 +3,9 @@ import { GeminiRequestError } from "@/lib/gemini-client";
 import { appendGeminiUsage } from "@/lib/gemini-usage";
 import {
   searchLegalCounselContext,
+  searchTaxCounselContext,
   streamLegalCounselAnswer,
+  type CounselMode,
   type LegalCounselHistoryItem,
   type LegalCounselSource,
 } from "@/lib/legal-counsel";
@@ -22,6 +24,7 @@ export async function POST(request: NextRequest) {
   let body: {
     message?: string;
     history?: LegalCounselHistoryItem[];
+    mode?: CounselMode;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -40,6 +43,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  const mode: CounselMode = body.mode === "tax" ? "tax" : "legal";
   const history = Array.isArray(body.history) ? body.history.slice(-8) : [];
 
   const stream = new ReadableStream({
@@ -49,7 +53,10 @@ export async function POST(request: NextRequest) {
       };
 
       try {
-        const bundle = await searchLegalCounselContext(message);
+        const bundle =
+          mode === "tax"
+            ? await searchTaxCounselContext(message)
+            : await searchLegalCounselContext(message);
         const sources: LegalCounselSource[] = [
           ...bundle.laws,
           ...bundle.precedents,
@@ -57,6 +64,7 @@ export async function POST(request: NextRequest) {
         ];
         send({
           type: "meta",
+          mode,
           sources,
           warnings: bundle.warnings,
         });
@@ -65,6 +73,7 @@ export async function POST(request: NextRequest) {
           userQuery: message,
           contextText: bundle.contextText,
           history,
+          mode,
           onChunk: (text) => send({ type: "delta", text }),
         });
 
@@ -76,6 +85,7 @@ export async function POST(request: NextRequest) {
 
         send({
           type: "done",
+          mode,
           model: result.model,
           usage: {
             inputTokens: result.usage.inputTokens,
@@ -89,7 +99,7 @@ export async function POST(request: NextRequest) {
             ? err.message
             : err instanceof Error
               ? err.message
-              : "법령전문상담 처리 중 오류가 발생했습니다.";
+              : "법률세무상담 처리 중 오류가 발생했습니다.";
         send({ type: "error", error: msg });
       } finally {
         controller.close();

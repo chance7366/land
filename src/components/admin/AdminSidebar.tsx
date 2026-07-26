@@ -36,7 +36,7 @@ const NAV = [
   { href: "/admin/reviews", label: "성공스토리", Icon: Star },
   { href: "/admin/consultations", label: "상담 예약", Icon: CalendarDays },
   { href: "/admin/legal", label: "찬스상담소", Icon: CircleHelp },
-  { href: "/admin/legal-counsel", label: "법령전문상담", Icon: Scale },
+  { href: "/admin/legal-counsel", label: "법률세무상담", Icon: Scale },
 ];
 
 type AdminSidebarProps = {

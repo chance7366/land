@@ -1,5 +1,7 @@
+export type CounselMode = "legal" | "tax";
+
 export type LegalCounselSource = {
-  kind: "법령" | "판례" | "해석례";
+  kind: "법령" | "판례" | "해석례" | "국세해석" | "포털";
   title: string;
   ref: string;
   summary?: string;

@@ -6,14 +6,19 @@ import {
   BookOpen,
   ClipboardCopy,
   Loader2,
+  Map,
   Scale,
   Send,
   Sparkles,
   StopCircle,
 } from "lucide-react";
+import { CounselAnswerText } from "@/components/admin/CounselAnswerText";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { LEGAL_COUNSEL_DISCLAIMER } from "@/lib/legal-counsel/system-prompt";
-import type { LegalCounselSource } from "@/lib/legal-counsel/types";
+import {
+  LEGAL_COUNSEL_DISCLAIMER,
+  TAX_COUNSEL_DISCLAIMER,
+} from "@/lib/legal-counsel/system-prompt";
+import type { CounselMode, LegalCounselSource } from "@/lib/legal-counsel/types";
 import {
   LEGAL_COUNSEL_PHASE2_TASKS,
   LEGAL_COUNSEL_PHASE3_TASKS,
@@ -28,18 +33,33 @@ type ChatMsg = {
 
 type Health = { gemini: boolean; lawOpenApi: boolean };
 
+const PLACEHOLDERS: Record<CounselMode, string> = {
+  legal: "예: 근저당보다 전입이 빠른 임차인의 대항력과 배당·인수 관계는?",
+  tax: "예: 1가구 1주택 양도소득세 비과세 요건과 일시적 2주택 특례는?",
+};
+
 export function AdminLegalCounselClient() {
+  const [mode, setMode] = useState<CounselMode>("legal");
+  const [histories, setHistories] = useState<Record<CounselMode, ChatMsg[]>>({
+    legal: [],
+    tax: [],
+  });
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [streamText, setStreamText] = useState("");
   const [liveSources, setLiveSources] = useState<LegalCounselSource[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [showRoadmap, setShowRoadmap] = useState(false);
   const [health, setHealth] = useState<Health | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+
+  const messages = histories[mode];
+  const disclaimer = mode === "tax" ? TAX_COUNSEL_DISCLAIMER : LEGAL_COUNSEL_DISCLAIMER;
 
   useEffect(() => {
     void fetch("/api/admin/legal-counsel/health", { cache: "no-store" })
@@ -50,7 +70,17 @@ export function AdminLegalCounselClient() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamText]);
+  }, [messages, streamText, mode]);
+
+  function switchMode(next: CounselMode) {
+    if (next === mode || streaming) return;
+    setMode(next);
+    setError("");
+    setWarnings([]);
+    setLiveSources([]);
+    setStreamText("");
+    setInput("");
+  }
 
   function stop() {
     abortRef.current?.abort();
@@ -62,16 +92,20 @@ export function AdminLegalCounselClient() {
     const message = input.trim();
     if (!message || streaming) return;
 
+    const activeMode = mode;
     setError("");
     setWarnings([]);
     setLiveSources([]);
     setInput("");
     const userMsg: ChatMsg = { id: `u-${Date.now()}`, role: "user", content: message };
-    setMessages((prev) => [...prev, userMsg]);
+    setHistories((prev) => ({
+      ...prev,
+      [activeMode]: [...prev[activeMode], userMsg],
+    }));
     setStreaming(true);
     setStreamText("");
 
-    const history = [...messages, userMsg]
+    const history = [...histories[activeMode], userMsg]
       .slice(-8)
       .map((m) => ({ role: m.role, content: m.content }));
 
@@ -83,7 +117,7 @@ export function AdminLegalCounselClient() {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, history }),
+        body: JSON.stringify({ message, history, mode: activeMode }),
         signal: ac.signal,
       });
 
@@ -124,49 +158,66 @@ export function AdminLegalCounselClient() {
 
           if (payload.type === "meta") {
             sources = payload.sources ?? [];
-            setLiveSources(sources);
-            setWarnings(payload.warnings ?? []);
+            if (modeRef.current === activeMode) {
+              setLiveSources(sources);
+              setWarnings(payload.warnings ?? []);
+            }
           } else if (payload.type === "delta" && payload.text) {
             full += payload.text;
-            setStreamText(full);
+            if (modeRef.current === activeMode) {
+              setStreamText(full);
+            }
           } else if (payload.type === "error") {
             throw new Error(payload.error || "오류");
           } else if (payload.type === "done") {
             finished = true;
-            setMessages((prev) => [
+            setHistories((prev) => ({
               ...prev,
-              {
-                id: `a-${Date.now()}`,
-                role: "assistant",
-                content: full,
-                sources,
-              },
-            ]);
-            setStreamText("");
+              [activeMode]: [
+                ...prev[activeMode],
+                {
+                  id: `a-${Date.now()}`,
+                  role: "assistant",
+                  content: full,
+                  sources,
+                },
+              ],
+            }));
+            if (modeRef.current === activeMode) {
+              setStreamText("");
+            }
           }
         }
       }
 
       if (full && !finished) {
-        setMessages((prev) => [
+        setHistories((prev) => ({
           ...prev,
-          { id: `a-${Date.now()}`, role: "assistant", content: full, sources },
-        ]);
-        setStreamText("");
+          [activeMode]: [
+            ...prev[activeMode],
+            { id: `a-${Date.now()}`, role: "assistant", content: full, sources },
+          ],
+        }));
+        if (modeRef.current === activeMode) {
+          setStreamText("");
+        }
       }
     } catch (e) {
       if ((e as Error).name === "AbortError") {
         setStreamText((current) => {
           if (current) {
-            setMessages((prev) => [
+            setHistories((prev) => ({
               ...prev,
-              {
-                id: `a-${Date.now()}`,
-                role: "assistant",
-                content: `${current}\n\n(중단됨)`,
-                sources: liveSources,
-              },
-            ]);
+              [activeMode]: [
+                ...prev[activeMode],
+                {
+                  id: `a-${Date.now()}`,
+                  role: "assistant",
+                  content: `${current}\n\n(중단됨)`,
+                  sources: liveSources,
+                },
+              ],
+            }));
           }
           return "";
         });
@@ -193,7 +244,7 @@ export function AdminLegalCounselClient() {
         <div>
           <h1 className="flex items-center gap-2 font-headline-lg text-landing-text">
             <Scale className="h-6 w-6 text-[#a78bfa]" />
-            법령전문상담
+            법률세무상담
           </h1>
           <p className="mt-1 text-sm text-landing-muted">
             관리자 전용 · 국가법령정보센터 + Gemini ·{" "}
@@ -203,15 +254,53 @@ export function AdminLegalCounselClient() {
             답변 초안용
           </p>
         </div>
-        <button
-          type="button"
-          onClick={copyLast}
-          disabled={!messages.some((m) => m.role === "assistant")}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-white/10 disabled:opacity-40"
-        >
-          <ClipboardCopy className="h-3.5 w-3.5" />
-          {copied ? "복사됨" : "답변 복사"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowRoadmap((v) => !v)}
+            aria-expanded={showRoadmap}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+              showRoadmap
+                ? "border-[#913dff]/40 bg-[#913dff]/15 text-violet-100"
+                : "border-white/15 bg-white/5 text-slate-200 hover:bg-white/10"
+            }`}
+          >
+            <Map className="h-3.5 w-3.5" />
+            확장방안
+          </button>
+          <button
+            type="button"
+            onClick={copyLast}
+            disabled={!messages.some((m) => m.role === "assistant")}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-white/10 disabled:opacity-40"
+          >
+            <ClipboardCopy className="h-3.5 w-3.5" />
+            {copied ? "복사됨" : "답변 복사"}
+          </button>
+        </div>
+      </div>
+
+      <div className="flex gap-1 rounded-xl border border-white/10 bg-black/25 p-1">
+        {(
+          [
+            { id: "legal" as const, label: "법률상담" },
+            { id: "tax" as const, label: "세무상담" },
+          ] as const
+        ).map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            disabled={streaming && mode !== tab.id}
+            onClick={() => switchMode(tab.id)}
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition ${
+              mode === tab.id
+                ? "bg-gradient-to-r from-[#4dabff]/35 to-[#913dff]/35 text-white"
+                : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+            } disabled:opacity-50`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {health && (
@@ -234,20 +323,23 @@ export function AdminLegalCounselClient() {
           >
             법령 API {health.lawOpenApi ? "OK" : "OC 미설정"}
           </span>
+          {mode === "tax" && (
+            <span className="rounded-full border border-sky-400/25 bg-sky-500/10 px-2.5 py-1 text-sky-100">
+              세무 · ntsCgmExpc · taxlaw · wetax
+            </span>
+          )}
         </div>
       )}
 
       <GlassCard className="p-3">
-        <p className="text-[11px] leading-relaxed text-amber-100/85">{LEGAL_COUNSEL_DISCLAIMER}</p>
+        <p className="text-[11px] leading-relaxed text-amber-100/85">{disclaimer}</p>
       </GlassCard>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
         <GlassCard className="flex min-h-[520px] flex-col overflow-hidden p-0">
           <div className="flex-1 space-y-3 overflow-y-auto p-4">
             {messages.length === 0 && !streaming && (
-              <p className="text-sm text-slate-500">
-                예: 근저당보다 전입이 빠른 임차인의 대항력과 배당·인수 관계는?
-              </p>
+              <p className="text-sm text-slate-500">{PLACEHOLDERS[mode]}</p>
             )}
             {messages.map((m) => (
               <div
@@ -255,30 +347,34 @@ export function AdminLegalCounselClient() {
                 className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`max-w-[92%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
+                  className={`max-w-[92%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
                     m.role === "user"
-                      ? "bg-gradient-to-r from-[#4dabff]/30 to-[#913dff]/30 text-white"
+                      ? "whitespace-pre-wrap bg-gradient-to-r from-[#4dabff]/30 to-[#913dff]/30 text-white"
                       : "border border-white/10 bg-black/30 text-slate-200"
                   }`}
                 >
                   {m.role === "assistant" && (
                     <p className="mb-2 flex items-center gap-1 text-[10px] font-bold text-[#c4b5fd]">
                       <Sparkles className="h-3 w-3" />
-                      AI 자문
+                      {mode === "tax" ? "AI 세무 자문" : "AI 법률 자문"}
                     </p>
                   )}
-                  {m.content}
+                  {m.role === "assistant" ? (
+                    <CounselAnswerText content={m.content} />
+                  ) : (
+                    m.content
+                  )}
                 </div>
               </div>
             ))}
             {streaming && streamText && (
               <div className="flex justify-start">
-                <div className="max-w-[92%] rounded-2xl border border-[#4dabff]/30 bg-black/30 px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap text-slate-200">
+                <div className="max-w-[92%] rounded-2xl border border-[#4dabff]/30 bg-black/30 px-3.5 py-2.5 text-sm leading-relaxed text-slate-200">
                   <p className="mb-2 flex items-center gap-1 text-[10px] font-bold text-sky-300">
                     <Loader2 className="h-3 w-3 animate-spin" />
                     스트리밍 중…
                   </p>
-                  {streamText}
+                  <CounselAnswerText content={streamText} />
                   <span className="ml-0.5 inline-block h-3 w-1.5 animate-pulse bg-[#4dabff]" />
                 </div>
               </div>
@@ -338,18 +434,32 @@ export function AdminLegalCounselClient() {
             이번 턴 참조
           </p>
           {liveSources.length === 0 ? (
-            <p className="text-[11px] text-white/35">검색된 법령·판례가 여기 표시됩니다.</p>
+            <p className="text-[11px] text-white/35">
+              {mode === "tax"
+                ? "검색된 세법·국세해석·포털이 여기 표시됩니다."
+                : "검색된 법령·판례가 여기 표시됩니다."}
+            </p>
           ) : (
             <ul className="space-y-2">
               {liveSources.map((s) => (
                 <li
-                  key={`${s.kind}-${s.title}`}
+                  key={`${s.kind}-${s.title}-${s.ref}`}
                   className="rounded-lg border border-white/10 bg-black/25 px-2.5 py-2 text-[11px]"
                 >
                   <span className="text-[#a78bfa]">{s.kind}</span>
                   <p className="mt-0.5 font-semibold text-white">{s.title}</p>
                   <p className="text-white/40">{s.ref}</p>
                   {s.summary && <p className="mt-1 text-white/50">{s.summary}</p>}
+                  {s.link && (
+                    <a
+                      href={s.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 inline-block text-[#4dabff] hover:underline"
+                    >
+                      원문 보기
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>
@@ -357,36 +467,38 @@ export function AdminLegalCounselClient() {
         </GlassCard>
       </div>
 
-      <GlassCard className="p-5">
-        <h2 className="text-base font-extrabold text-white">향후 확장 — 해야 할 일</h2>
-        <p className="mt-1 text-xs text-white/45">
-          Phase 1(현재) 이후 순차 진행 과제입니다.
-        </p>
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <div className="rounded-xl border border-sky-400/20 bg-sky-500/[0.06] p-4">
-            <p className="text-sm font-bold text-sky-100">Phase 2 · RAG 고도화</p>
-            <ul className="mt-3 space-y-3">
-              {LEGAL_COUNSEL_PHASE2_TASKS.map((t) => (
-                <li key={t.title} className="text-[12px]">
-                  <p className="font-semibold text-white/90">{t.title}</p>
-                  <p className="mt-0.5 leading-relaxed text-white/45">{t.detail}</p>
-                </li>
-              ))}
-            </ul>
+      {showRoadmap && (
+        <GlassCard className="p-5">
+          <h2 className="text-base font-extrabold text-white">향후 확장 — 해야 할 일</h2>
+          <p className="mt-1 text-xs text-white/45">
+            Phase 1(현재) 이후 순차 진행 과제입니다.
+          </p>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div className="rounded-xl border border-sky-400/20 bg-sky-500/[0.06] p-4">
+              <p className="text-sm font-bold text-sky-100">Phase 2 · RAG 고도화</p>
+              <ul className="mt-3 space-y-3">
+                {LEGAL_COUNSEL_PHASE2_TASKS.map((t) => (
+                  <li key={t.title} className="text-[12px]">
+                    <p className="font-semibold text-white/90">{t.title}</p>
+                    <p className="mt-0.5 leading-relaxed text-white/45">{t.detail}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-xl border border-violet-400/20 bg-violet-500/[0.06] p-4">
+              <p className="text-sm font-bold text-violet-100">Phase 3 · 기관·멀티모달 확장</p>
+              <ul className="mt-3 space-y-3">
+                {LEGAL_COUNSEL_PHASE3_TASKS.map((t) => (
+                  <li key={t.title} className="text-[12px]">
+                    <p className="font-semibold text-white/90">{t.title}</p>
+                    <p className="mt-0.5 leading-relaxed text-white/45">{t.detail}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
-          <div className="rounded-xl border border-violet-400/20 bg-violet-500/[0.06] p-4">
-            <p className="text-sm font-bold text-violet-100">Phase 3 · 기관·멀티모달 확장</p>
-            <ul className="mt-3 space-y-3">
-              {LEGAL_COUNSEL_PHASE3_TASKS.map((t) => (
-                <li key={t.title} className="text-[12px]">
-                  <p className="font-semibold text-white/90">{t.title}</p>
-                  <p className="mt-0.5 leading-relaxed text-white/45">{t.detail}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </GlassCard>
+        </GlassCard>
+      )}
     </div>
   );
 }

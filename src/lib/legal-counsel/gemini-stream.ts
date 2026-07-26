@@ -4,9 +4,11 @@ import { GEMINI_FLASH_25_MODEL, type AuctionReportModelId } from "@/lib/auction-
 import { buildUsageRecord, type GeminiUsageRecord } from "@/lib/gemini-usage-shared";
 import {
   buildLegalCounselUserPrompt,
+  buildTaxCounselUserPrompt,
   LEGAL_COUNSEL_SYSTEM_PROMPT,
+  TAX_COUNSEL_SYSTEM_PROMPT,
 } from "./system-prompt";
-import type { LegalCounselHistoryItem } from "./types";
+import type { CounselMode, LegalCounselHistoryItem } from "./types";
 
 const DEFAULT_MODEL: AuctionReportModelId = GEMINI_FLASH_25_MODEL;
 
@@ -20,6 +22,7 @@ export async function streamLegalCounselAnswer(args: {
   userQuery: string;
   contextText: string;
   history?: LegalCounselHistoryItem[];
+  mode?: CounselMode;
   onChunk: (text: string) => void;
 }): Promise<LegalCounselStreamResult> {
   const apiKey = getGeminiApiKey();
@@ -27,19 +30,29 @@ export async function streamLegalCounselAnswer(args: {
     throw new GeminiRequestError("GEMINI_API_KEY가 설정되어 있지 않습니다.", 503);
   }
 
+  const mode: CounselMode = args.mode === "tax" ? "tax" : "legal";
   const model = DEFAULT_MODEL;
   const ai = new GoogleGenAI({ apiKey });
-  const userPrompt = buildLegalCounselUserPrompt({
-    contextText: args.contextText,
-    userQuery: args.userQuery,
-    history: args.history,
-  });
+  const userPrompt =
+    mode === "tax"
+      ? buildTaxCounselUserPrompt({
+          contextText: args.contextText,
+          userQuery: args.userQuery,
+          history: args.history,
+        })
+      : buildLegalCounselUserPrompt({
+          contextText: args.contextText,
+          userQuery: args.userQuery,
+          history: args.history,
+        });
+  const systemInstruction =
+    mode === "tax" ? TAX_COUNSEL_SYSTEM_PROMPT : LEGAL_COUNSEL_SYSTEM_PROMPT;
 
   const stream = await ai.models.generateContentStream({
     model,
     contents: [{ role: "user", parts: [{ text: userPrompt }] }],
     config: {
-      systemInstruction: LEGAL_COUNSEL_SYSTEM_PROMPT,
+      systemInstruction,
       temperature: 0.2,
     },
   });
@@ -68,7 +81,7 @@ export async function streamLegalCounselAnswer(args: {
       model,
       inputTokens,
       outputTokens,
-      caseNumber: "legal-counsel",
+      caseNumber: mode === "tax" ? "tax-counsel" : "legal-counsel",
     }),
   };
 }

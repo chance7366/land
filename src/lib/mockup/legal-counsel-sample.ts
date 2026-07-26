@@ -33,11 +33,40 @@ export const LEGAL_COUNSEL_SAMPLE_SOURCES = [
   { kind: "해석", title: "(목업) 법령해석례", ref: "Phase 1: law.go.kr expc 실시간 검색" },
 ] as const;
 
+export const TAX_COUNSEL_SAMPLE_QUERY =
+  "1가구 1주택 양도소득세 비과세와 일시적 2주택 특례의 요건을 간단히 설명해 주세요.";
+
+export const TAX_COUNSEL_SAMPLE_ANSWER = `■ [요약 답변]
+1가구 1주택 양도소득세 비과세는 「소득세법」상 거주·보유 요건을 충족한 경우 적용되며, 일시적 2주택은 종전 주택 처분 기한 등 특례 요건을 갖출 때 비과세가 유지될 수 있습니다. 구체 세액은 사실관계에 따라 달라지므로 홈택스·세무사 확인이 필요합니다.
+
+■ [법률 및 판례 근거]
+「소득세법」 제89조 및 관련 시행령: 1세대 1주택 비과세 요건
+국세청 법령해석·세법해석례: 일시적 2주택 특례 적용 기준(안건·해석일자는 참조 DB 확인)
+국세법령정보시스템(taxlaw.nts.go.kr): 세법해석례·판례·결정례 재확인
+
+■ [실무 분석 및 권리관계]
+· 취득·양도일, 보유·거주 기간, 세대 구성이 핵심 사실관계입니다.
+· 일시적 2주택은 신규 취득 후 종전 주택 처분 기한·가액 요건을 함께 봅니다.
+· 지방세(취득세)는 국세와 별개이므로 위택스·지자체 기준을 병행 확인합니다.
+
+■ [공인중개사 대응 가이드]
+찬스상담소 답변 시 “비과세·특례는 사실관계에 따라 달라질 수 있으니 세무사·홈택스에서 최종 확인” 멘트를 넣고, 계약서·등기·취득가액 자료를 안내하십시오.
+
+■ [법적 면책 고지]
+본 내용은 공공 세무·법령 참고 자료이며 세액 확정·신고 대행이 아닙니다. 신고·납부 전 세무사 또는 과세관청 확인이 필요합니다.`;
+
+export const TAX_COUNSEL_SAMPLE_SOURCES = [
+  { kind: "법령", title: "소득세법 제89조", ref: "국가법령정보센터" },
+  { kind: "국세해석", title: "(목업) ntsCgmExpc 해석례", ref: "open.law 국세청 법령해석" },
+  { kind: "포털", title: "국세법령정보시스템", ref: "taxlaw.nts.go.kr" },
+  { kind: "포털", title: "위택스", ref: "wetax.go.kr" },
+] as const;
+
 export const LEGAL_COUNSEL_PHASE1_CHECKLIST = [
-  "관리자 전용 메뉴 · /admin/legal-counsel",
-  "국가법령정보센터 API 실시간 검색",
-  "Gemini 스트리밍 + 5단 답변 구조",
-  "면책 고지 · 찬스상담소 붙여넣기 복사",
+  "관리자 전용 메뉴 · /admin/legal-counsel · 법률세무상담",
+  "법률상담 | 세무상담 탭 분리 · 이력 독립",
+  "국가법령정보센터 API + ntsCgmExpc · taxlaw/wetax 포털",
+  "Gemini 스트리밍 + 5단 답변 구조 · 면책·복사",
 ] as const;
 
 export const LEGAL_COUNSEL_PHASE2_TASKS = [
