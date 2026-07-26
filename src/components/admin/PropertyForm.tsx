@@ -7,6 +7,7 @@ import {
   Check,
   CheckCircle2,
   CircleAlert,
+  FileImage,
   ImagePlus,
   Loader2,
   RefreshCw,
@@ -14,6 +15,12 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { FlyerPreviewModal } from "@/components/flyer/FlyerPreviewModal";
+import {
+  mapPropertyToFlyer,
+  propertyFormToFlyerSource,
+} from "@/lib/flyer/map-property";
+import type { FlyerViewModel } from "@/lib/flyer/types";
 import { navigateTo } from "@/lib/navigate";
 import type { Property, PropertyCategory, PropertyType } from "@prisma/client";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -186,8 +193,16 @@ export function PropertyForm({ initial }: PropertyFormProps) {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [flyerOpen, setFlyerOpen] = useState(false);
+  const [flyerData, setFlyerData] = useState<FlyerViewModel | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isEdit = Boolean(initial);
+
+  function openFlyerPreview() {
+    if (!initial?.id) return;
+    setFlyerData(mapPropertyToFlyer(propertyFormToFlyerSource(initial.id, form)));
+    setFlyerOpen(true);
+  }
 
   const category = form.category as PropertyCategory;
   const dealType = form.type as PropertyType;
@@ -1147,6 +1162,16 @@ export function PropertyForm({ initial }: PropertyFormProps) {
             </button>
             <button
               type="button"
+              disabled={!isEdit || loading}
+              onClick={openFlyerPreview}
+              title={isEdit ? "A4 광고전단지 미리보기" : "저장 후 수정 화면에서 생성할 수 있습니다"}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-orange-400/40 bg-orange-500/20 px-4 py-2 text-sm font-bold text-orange-100 disabled:opacity-40"
+            >
+              <FileImage className="h-3.5 w-3.5" />
+              광고전단지 생성
+            </button>
+            <button
+              type="button"
               disabled={loading}
               onClick={() => void handleSubmit()}
               className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#4dabff] to-[#913dff] px-5 py-2 text-sm font-bold text-white disabled:opacity-50"
@@ -1157,6 +1182,12 @@ export function PropertyForm({ initial }: PropertyFormProps) {
           </div>
         </div>
       </div>
+
+      <FlyerPreviewModal
+        open={flyerOpen}
+        onClose={() => setFlyerOpen(false)}
+        data={flyerData}
+      />
     </div>
   );
 }

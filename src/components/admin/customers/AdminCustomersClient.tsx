@@ -209,10 +209,16 @@ function toWriteInput(form: CreateForm): CustomerWriteInput {
   };
 }
 
-export function AdminCustomersClient({ initialItems }: { initialItems: CustomerCardDTO[] }) {
+export function AdminCustomersClient({
+  initialItems,
+  initialView = "dashboard",
+}: {
+  initialItems: CustomerCardDTO[];
+  initialView?: View;
+}) {
   const router = useRouter();
   const [items, setItems] = useState(initialItems);
-  const [view, setView] = useState<View>("dashboard");
+  const [view, setView] = useState<View>(initialView);
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [form, setForm] = useState<CreateForm>(emptyCreate);
@@ -223,6 +229,10 @@ export function AdminCustomersClient({ initialItems }: { initialItems: CustomerC
   useEffect(() => {
     setItems(initialItems);
   }, [initialItems]);
+
+  useEffect(() => {
+    setView(initialView);
+  }, [initialView]);
 
   useEffect(() => {
     const phone = form.phone.trim();

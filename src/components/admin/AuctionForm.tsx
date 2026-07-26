@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Copy,
   ExternalLink,
+  FileImage,
   FileText,
   ImagePlus,
   Loader2,
@@ -15,6 +16,9 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { FlyerPreviewModal } from "@/components/flyer/FlyerPreviewModal";
+import { mapAuctionToFlyer } from "@/lib/flyer/map-auction";
+import type { FlyerViewModel } from "@/lib/flyer/types";
 import type { Auction } from "@prisma/client";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { AppLink as Link } from "@/components/ui/AppLink";
@@ -815,6 +819,52 @@ export function AuctionForm({ initial }: AuctionFormProps) {
     useState<AuctionReportModelId>(GEMINI_FLASH_MODEL);
   const [memberReportModel, setMemberReportModel] =
     useState<AuctionReportModelId>(GEMINI_FLASH_MODEL);
+  const [flyerOpen, setFlyerOpen] = useState(false);
+  const [flyerData, setFlyerData] = useState<FlyerViewModel | null>(null);
+
+  function openFlyerPreview() {
+    if (!initial?.id) return;
+    const appraisal = Number(moneyDigits(form.appraisalPrice)) || initial.appraisalPrice || null;
+    const min =
+      Number(moneyDigits(form.minPrice)) ||
+      Number(moneyDigits(form.recommendedPrice)) ||
+      initial.minPrice ||
+      initial.recommendedPrice ||
+      null;
+    const land =
+      form.landArea !== "" && form.landArea != null
+        ? Number(form.landArea)
+        : initial.landArea;
+    const building =
+      form.exclusiveArea !== "" && form.exclusiveArea != null
+        ? Number(form.exclusiveArea)
+        : form.buildingArea !== "" && form.buildingArea != null
+          ? Number(form.buildingArea)
+          : initial.buildingArea;
+    setFlyerData(
+      mapAuctionToFlyer({
+        id: initial.id,
+        title: form.title || initial.title,
+        caseNumber: form.caseNumber || initial.caseNumber,
+        itemNo: form.itemNo || initial.itemNo,
+        court: form.court || initial.court,
+        address: form.address || initial.address,
+        address2: form.address2 || initial.address2,
+        appraisalPrice: appraisal,
+        minPrice: min,
+        recommendedPrice: min,
+        bidDeposit: Number(moneyDigits(form.bidDeposit)) || initial.bidDeposit,
+        saleDate: form.saleDate || initial.saleDate,
+        landArea: land,
+        buildingArea: building,
+        images,
+        rightsAnalysis: initial.rightsAnalysis,
+        description: form.appraisalSummary || form.chanceOpinion || initial.description,
+        memo: form.chanceOpinion || initial.memo,
+      }),
+    );
+    setFlyerOpen(true);
+  }
 
   function setMoneyField(key: keyof FormState, value: string) {
     setField(key, moneyDigits(value) as FormState[typeof key]);
@@ -2422,8 +2472,31 @@ export function AuctionForm({ initial }: AuctionFormProps) {
           <Section
             n={14}
             title="분석 리포트"
-            hint="일반리포트(1~3)와 회원리포트(1~7)를 분리 생성·관리합니다. 텍스트·PDF는 종류별 선택 모델, 이미지는 Nano Banana Pro로 사전 요약합니다."
+            hint="일반리포트(1~3)와 회원리포트(1~7)를 분리 생성·관리합니다. A4 광고전단지는 Gemini 리포트와 별도입니다."
           >
+            <div className="mb-4 rounded-2xl border-2 border-orange-400/45 bg-gradient-to-br from-orange-500/20 to-amber-500/10 p-4 md:p-5">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <span className="inline-flex rounded-full bg-orange-500/25 px-2.5 py-0.5 text-[11px] font-bold text-orange-100 ring-1 ring-orange-400/35">
+                    FLYER
+                  </span>
+                  <h3 className="mt-2 text-base font-bold text-white">A4 광고전단지</h3>
+                  <p className="mt-0.5 text-[12px] text-slate-300">
+                    1페이지 · 법정 명시 · 영업·현장용 (현재 폼 데이터 기준 미리보기)
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={openFlyerPreview}
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#4dabff] to-[#913dff] px-4 py-2.5 text-sm font-bold text-white"
+                >
+                  <FileImage className="h-4 w-4" />
+                  전단지 생성 · 보기
+                </button>
+              </div>
+            </div>
             <div className="grid gap-4 lg:grid-cols-2">
               {(
                 [
@@ -2621,6 +2694,16 @@ export function AuctionForm({ initial }: AuctionFormProps) {
             </button>
             <button
               type="button"
+              disabled={!isEdit || saving}
+              onClick={openFlyerPreview}
+              title={isEdit ? "A4 광고전단지 미리보기" : "저장 후 수정 화면에서 생성할 수 있습니다"}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-orange-400/40 bg-orange-500/20 px-4 py-2 text-sm font-bold text-orange-100 disabled:opacity-40"
+            >
+              <FileImage className="h-3.5 w-3.5" />
+              광고전단지
+            </button>
+            <button
+              type="button"
               disabled={saving}
               onClick={() => void handleSave()}
               className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#4dabff] to-[#913dff] px-5 py-2 text-sm font-bold text-white disabled:opacity-50"
@@ -2631,6 +2714,12 @@ export function AuctionForm({ initial }: AuctionFormProps) {
           </div>
         </div>
       </div>
+
+      <FlyerPreviewModal
+        open={flyerOpen}
+        onClose={() => setFlyerOpen(false)}
+        data={flyerData}
+      />
 
       {toast && (
         <div className="fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-full border border-white/15 bg-[#121826] px-4 py-2 text-xs text-slate-100 shadow-xl">

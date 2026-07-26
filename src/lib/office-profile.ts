@@ -6,6 +6,8 @@ export const OFFICE_PROFILE = {
   address: "충청남도 홍성군 홍북읍 신경리 1369 (내포신도시)",
   addressShort: "충남 홍성군 홍북읍 신경리 1369",
   regNo: "44800-2024-00001",
+  /** 매수신청대리 등록번호 — 확정 후 기입 */
+  bidAgentRegNo: "",
   brokerName: "김영찬",
   brokerPhone: "041-633-0000",
   agentName: "담당 상담",

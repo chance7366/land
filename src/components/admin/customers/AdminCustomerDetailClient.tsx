@@ -91,7 +91,7 @@ export function AdminCustomerDetailClient({
       setCard(data.item);
       setForm({ ...data.item });
       setContactChannels(parseContactMethods(data.item.primaryContactMethod));
-      setMsg("저장했습니다.");
+      router.push("/admin/customers?view=list");
       router.refresh();
     } catch {
       setMsg("저장 중 오류");
@@ -143,7 +143,7 @@ export function AdminCustomerDetailClient({
         setMsg(data.error ?? "삭제 실패");
         return;
       }
-      router.push("/admin/customers");
+      router.push("/admin/customers?view=list");
       router.refresh();
     } catch {
       setMsg("삭제 중 오류");
@@ -158,7 +158,10 @@ export function AdminCustomerDetailClient({
     <main className="space-y-6 p-6 text-landing-text md:p-10">
       <header className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
-          <Link href="/admin/customers" className="text-xs text-sky-300 hover:underline">
+          <Link
+            href="/admin/customers?view=list"
+            className="text-xs text-sky-300 hover:underline"
+          >
             ← 고객 목록
           </Link>
           <h1 className="mt-1 font-serif text-2xl font-bold text-white">{card.name}</h1>

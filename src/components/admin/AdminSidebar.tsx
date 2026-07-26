@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { formatUsd } from "@/lib/gemini-usage-shared";
 
+const AI_STUDIO_SPEND_URL = "https://aistudio.google.com/spend";
+
 const NAV = [
   { href: "/admin", label: "대시보드", Icon: LayoutDashboard },
   { href: "/admin/customers", label: "고객 관리", Icon: Users },
@@ -122,13 +124,21 @@ export function AdminSidebar({ authEnabled }: AdminSidebarProps) {
           {geminiToday && (
             <p
               className="mt-2 rounded-lg border border-white/10 bg-black/25 px-2 py-1.5 text-[10px] leading-snug text-slate-300"
-              title="AI Studio 단가 기준 추정 · 실제 청구와 다를 수 있음"
+              title="앱 내부 추정 · 실제 청구는 AI Studio Spend 참고"
             >
               오늘 Gemini{" "}
               <span className="font-semibold text-[#d4bfff]">
                 {formatUsd(geminiToday.totalCostUsd)}
               </span>
               <span className="text-slate-500"> · {geminiToday.calls}회</span>
+              <a
+                href={AI_STUDIO_SPEND_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-1.5 text-blue-400/90 underline-offset-2 hover:text-blue-300 hover:underline"
+              >
+                Spend
+              </a>
             </p>
           )}
           {!authEnabled && (
@@ -201,6 +211,14 @@ export function AdminSidebar({ authEnabled }: AdminSidebarProps) {
             {geminiToday && (
               <p className="mt-0.5 text-[10px] text-slate-400">
                 Gemini {formatUsd(geminiToday.totalCostUsd)} · {geminiToday.calls}회
+                <a
+                  href={AI_STUDIO_SPEND_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-1.5 text-blue-400/90 underline-offset-2 hover:text-blue-300 hover:underline"
+                >
+                  Spend
+                </a>
               </p>
             )}
           </div>
