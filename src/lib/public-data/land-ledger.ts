@@ -99,9 +99,21 @@ export async function resolvePnuFromAddress(
   try {
     const res = await fetch(`${ADDRESS_URL}?${params.toString()}`, {
       cache: "no-store",
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "ChanceLedger/1.0 (+https://landchance.vercel.app)",
+      },
     });
-    const json = (await res.json()) as {
+    const text = await res.text();
+    if (!res.ok || text.trimStart().startsWith("<")) {
+      return {
+        ok: false,
+        code: "UPSTREAM",
+        error:
+          "브이월드 주소 API가 차단되었거나 키 도메인이 맞지 않습니다. PNU 19자리를 직접 입력하세요.",
+      };
+    }
+    const json = JSON.parse(text) as {
       response?: {
         status?: string;
         result?: { point?: unknown; zipcode?: string; text?: string };
@@ -195,9 +207,22 @@ export async function fetchLandLedger(input: {
     try {
       const res = await fetch(`${LAND_CHAR_URL}?${params.toString()}`, {
         cache: "no-store",
-        headers: { Accept: "application/json" },
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "ChanceLedger/1.0 (+https://landchance.vercel.app)",
+        },
       });
-      const json = (await res.json()) as {
+      const text = await res.text();
+      if (!res.ok || text.trimStart().startsWith("<")) {
+        lastError = {
+          ok: false,
+          code: "UPSTREAM",
+          error:
+            "브이월드 토지특성 API가 차단되었거나 키 도메인이 맞지 않습니다.",
+        };
+        break;
+      }
+      const json = JSON.parse(text) as {
         landCharacteristicss?: {
           field?: LandCharItem | LandCharItem[];
         };
