@@ -219,7 +219,7 @@ function formatCaseTail(serial: string, itemNo: number | null): string {
 function emptyForm(): FormState {
   return {
     court: "홍성지원",
-    caseYear: "2025",
+    caseYear: "2026",
     caseTail: "",
     caseSerial: "",
     caseNumber: "",
@@ -1095,11 +1095,36 @@ export function AuctionForm({ initial }: AuctionFormProps) {
           itemNo: preferredItem ?? null,
         }),
       });
-      const data = (await res.json()) as {
+      let data: {
         ok?: boolean;
         error?: string;
         items?: CourtAuctionFixture[];
-      };
+      } = {};
+      try {
+        data = (await res.json()) as {
+          ok?: boolean;
+          error?: string;
+          items?: CourtAuctionFixture[];
+        };
+      } catch {
+        setFetching(false);
+        if (cached.length > 0) {
+          applyFetchedMatches(cached, preferredItem, year, serial, "cache");
+          setToast(
+            res.status === 504 || res.status === 408
+              ? "법원 조회 시간 초과 · 로컬 캐시로 채웠습니다."
+              : `법원 응답 오류(HTTP ${res.status}) · 로컬 캐시로 채웠습니다.`,
+          );
+          return;
+        }
+        setToast("");
+        setError(
+          res.status === 504 || res.status === 408
+            ? "법원 조회가 시간 초과되었습니다. 잠시 후 다시 시도하거나 수동 입력하세요."
+            : `법원 조회 응답을 읽지 못했습니다 (HTTP ${res.status}).`,
+        );
+        return;
+      }
       setFetching(false);
       if (res.ok && data.ok && data.items?.length) {
         applyFetchedMatches(data.items, preferredItem, year, serial, "live");
