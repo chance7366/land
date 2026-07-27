@@ -27,6 +27,8 @@ export function WindowFlyerPreviewModal({ open, onClose, data }: Props) {
       setTemplate(null);
       setPptxError(null);
     }
+    // publicPath changes when opening a different listing
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only on open/path
   }, [open, data?.publicPath]);
 
   if (!open || !data) return null;
@@ -40,8 +42,28 @@ export function WindowFlyerPreviewModal({ open, onClose, data }: Props) {
     setPptxBusy(true);
     setPptxError(null);
     try {
-      const { downloadWindowFlyerPptx } = await import("@/lib/flyer/window-flyer-pptx");
-      await downloadWindowFlyerPptx(snapshot, tpl);
+      const res = await fetch("/api/admin/flyers/window-pptx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: snapshot, template: tpl }),
+      });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(err.error || `PPT 생성 실패 (${res.status})`);
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition") || "";
+      const utf = /filename\*=UTF-8''([^;]+)/i.exec(cd);
+      const plain = /filename=\"([^\"]+)\"/i.exec(cd);
+      const fileName = utf
+        ? decodeURIComponent(utf[1]!)
+        : plain?.[1] || `창문전단지_Type${tpl}.pptx`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
     } catch (e) {
       setPptxError(e instanceof Error ? e.message : "PPT 생성에 실패했습니다");
     } finally {

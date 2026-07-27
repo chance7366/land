@@ -1,8 +1,9 @@
 /**
  * 창문전단지 → PPTX (A4 세로 1장)
- * 클라이언트에서 pptxgenjs로 생성·다운로드
+ * 서버 전용 (pptxgenjs는 Node API 사용)
  */
 
+import "server-only";
 import PptxGenJS from "pptxgenjs";
 import { OFFICE_PROFILE } from "@/lib/office-profile";
 import { flyerQrSrc, getPublicBaseUrl } from "@/lib/flyer/site-url";
@@ -600,10 +601,10 @@ function buildTypeC(pptx: PptxGenJS, data: WindowFlyerViewModel) {
   addFooterBar(slide, data, isAuction ? "0F172A" : "3B5BDB");
 }
 
-export async function downloadWindowFlyerPptx(
+export async function buildWindowFlyerPptxBuffer(
   data: WindowFlyerViewModel,
   template?: WindowFlyerTemplate,
-): Promise<void> {
+): Promise<{ buffer: Buffer; fileName: string }> {
   const t = template ?? data.template ?? "A";
   const pptx = new PptxGenJS();
   pptx.defineLayout({ name: "A4_PORTRAIT", width: W, height: H });
@@ -615,6 +616,10 @@ export async function downloadWindowFlyerPptx(
   else if (t === "C") buildTypeC(pptx, data);
   else buildTypeA(pptx, data);
 
-  const file = `창문전단지_Type${t}_${safeName(data.badge)}_${safeName(data.title)}.pptx`;
-  await pptx.writeFile({ fileName: file });
+  const fileName = `창문전단지_Type${t}_${safeName(data.badge)}_${safeName(data.title)}.pptx`;
+  const out = await pptx.write({ outputType: "nodebuffer" });
+  const buffer = Buffer.isBuffer(out)
+    ? out
+    : Buffer.from(out as Uint8Array);
+  return { buffer, fileName };
 }

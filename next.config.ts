@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
     "@sparticuz/chromium",
     "playwright-core",
     "playwright",
+    "pptxgenjs",
   ],
   images: {
     remotePatterns: [
