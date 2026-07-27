@@ -239,7 +239,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     const hint = /Executable doesn't exist|browserType\.launch|libnspr4|Failed to launch/i.test(
       msg,
     )
-      ? " 프로덕션 Chromium(@sparticuz/chromium) 실행에 실패했습니다. 배포 로그를 확인하세요."
+      ? " 프로덕션 Chromium(@sparticuz/chromium-min) 실행에 실패했습니다. 배포 로그를 확인하세요."
       : "";
     return NextResponse.json({ error: `PDF 변환 실패: ${msg}.${hint}` }, { status: 500 });
   }

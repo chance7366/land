@@ -1151,7 +1151,7 @@ export async function fetchCourtAuctionLive(input: LiveFetchInput): Promise<Live
       return {
         ok: false,
         error:
-          "브라우저 실행에 실패했습니다. 프로덕션은 @sparticuz/chromium 기반으로 동작합니다. 배포·함수 로그를 확인해 주세요.",
+          "브라우저 실행에 실패했습니다. 프로덕션은 @sparticuz/chromium-min(원격 pack) 기반으로 동작합니다. 배포·함수 로그를 확인해 주세요.",
       };
     }
     return { ok: false, error: `법원 조회 중 오류: ${msg}` };

@@ -445,6 +445,14 @@ function auctionToForm(auction?: Auction): FormState {
 }
 
 function fixtureToForm(f: CourtAuctionFixture): FormState {
+  const item = f.caseDetail?.available ? f.caseDetail.item : null;
+  const appraisal =
+    f.appraisalPrice > 0 ? f.appraisalPrice : item?.appraisalPrice ?? 0;
+  const minPrice = f.minPrice > 0 ? f.minPrice : item?.minPrice ?? 0;
+  const bidDeposit =
+    f.bidDeposit > 0 ? f.bidDeposit : item?.bidDeposit ?? 0;
+  const claimAmount =
+    f.claimAmount > 0 ? f.claimAmount : f.caseDetail?.basic?.claimAmount ?? 0;
   return {
     ...emptyForm(),
     court: f.court,
@@ -468,10 +476,10 @@ function fixtureToForm(f: CourtAuctionFixture): FormState {
     address2: f.parcels[1]?.address ?? "",
     saleDate: f.saleDate,
     saleDateLabel: f.saleDateLabel,
-    appraisalPrice: String(f.appraisalPrice),
-    minPrice: String(f.minPrice),
-    bidDeposit: String(f.bidDeposit),
-    claimAmount: String(f.claimAmount),
+    appraisalPrice: appraisal > 0 ? String(appraisal) : "",
+    minPrice: minPrice > 0 ? String(minPrice) : "",
+    bidDeposit: bidDeposit > 0 ? String(bidDeposit) : "",
+    claimAmount: claimAmount > 0 ? String(claimAmount) : "",
     recommendedPrice: "",
     winningPrice: "",
     winningRatio: "",
