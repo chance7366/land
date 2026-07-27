@@ -3,12 +3,19 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { getUploadDir, uploadUrlPrefix, type UploadKind } from "@/lib/uploads";
-import { isSupabaseEnabled, PROPERTY_IMAGES_BUCKET } from "@/lib/supabase/config";
+import {
+  canUseSupabaseStorage,
+  PROPERTY_IMAGES_BUCKET,
+} from "@/lib/supabase/config";
 import { uploadPropertyImage } from "@/lib/supabase/storage";
 
+export const runtime = "nodejs";
+
 const MAX_FILES = 20;
-const MAX_BYTES = 20 * 1024 * 1024;
+/** Vercel 본문 한도(~4.5MB)에 맞춤 · 클라이언트도 동일 안내 */
+const MAX_BYTES = 4 * 1024 * 1024;
 const KINDS = new Set<UploadKind>(["properties", "auctions"]);
+const ON_VERCEL = Boolean(process.env.VERCEL);
 
 /** 서류·입찰가산정 자료 공통 허용 MIME */
 const ALLOWED = new Set([
@@ -56,7 +63,6 @@ function resolveMime(file: File): { mime: string; ext: string } | null {
   if (!ALLOWED_EXT.has(ext)) return null;
   const fromExt = TYPE_BY_EXT[ext];
   const raw = (file.type || "").trim().toLowerCase();
-  // 브라우저가 octet-stream/빈 type을 주는 경우 확장자 MIME 사용
   if (!raw || raw === "application/octet-stream" || !ALLOWED.has(raw)) {
     return { mime: fromExt, ext: ext.slice(1) };
   }
@@ -91,7 +97,17 @@ export async function POST(request: NextRequest) {
 
     const urls: string[] = [];
     let storage: string = "local";
-    const useSupabase = isSupabaseEnabled();
+    const useStorage = canUseSupabaseStorage();
+
+    if (ON_VERCEL && !useStorage) {
+      return NextResponse.json(
+        {
+          error:
+            "프로덕션 사진 업로드에는 Supabase Storage가 필요합니다. Vercel에 SUPABASE_SERVICE_ROLE_KEY · NEXT_PUBLIC_SUPABASE_URL 을 설정하세요.",
+        },
+        { status: 503 },
+      );
+    }
 
     for (const file of files) {
       const resolved = resolveMime(file);
@@ -105,15 +121,17 @@ export async function POST(request: NextRequest) {
         );
       }
       if (file.size > MAX_BYTES) {
-        return NextResponse.json({ error: "각 파일은 20MB 이하여야 합니다." }, { status: 400 });
+        return NextResponse.json(
+          { error: "각 파일은 4MB 이하여야 합니다. (호스팅 업로드 한도)" },
+          { status: 400 },
+        );
       }
 
       const { mime, ext } = resolved;
       const filename = `${Date.now()}-${randomUUID().slice(0, 8)}.${ext}`;
       const buffer = Buffer.from(await file.arrayBuffer());
 
-      // 이미지만 Supabase 시도 — 문서 MIME은 버킷 거부 가능성이 높아 로컬 우선
-      const trySupabase = useSupabase && mime.startsWith("image/");
+      const trySupabase = useStorage && mime.startsWith("image/");
       if (trySupabase) {
         try {
           const storagePath = `${kind}/${filename}`;
@@ -122,12 +140,27 @@ export async function POST(request: NextRequest) {
           storage = PROPERTY_IMAGES_BUCKET;
           continue;
         } catch (e) {
-          console.warn(
-            "[admin/uploads] Supabase 업로드 실패 → 로컬 폴백",
-            mime,
-            e instanceof Error ? e.message : e,
-          );
+          const msg = e instanceof Error ? e.message : String(e);
+          console.warn("[admin/uploads] Supabase 업로드 실패", mime, msg);
+          if (ON_VERCEL) {
+            return NextResponse.json(
+              {
+                error: `사진 저장(Storage) 실패: ${msg}. property-images 버킷·MIME·Service Role 키를 확인하세요.`,
+              },
+              { status: 502 },
+            );
+          }
         }
+      }
+
+      if (ON_VERCEL) {
+        return NextResponse.json(
+          {
+            error:
+              "서버에 파일을 저장할 수 없습니다. 이미지는 Supabase Storage, 또는 URL로 추가를 이용해 주세요.",
+          },
+          { status: 503 },
+        );
       }
 
       urls.push(await saveLocal(kind, filename, buffer));
@@ -137,12 +170,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ urls, storage }, { status: 201 });
   } catch (e) {
     console.error("[admin/uploads]", e);
+    const msg = e instanceof Error ? e.message : "";
+    // Vercel 본문 한도 초과 등
+    if (/body|payload|too large|413/i.test(msg)) {
+      return NextResponse.json(
+        { error: "파일이 너무 큽니다. 각 4MB 이하 JPG/PNG로 다시 시도하세요." },
+        { status: 413 },
+      );
+    }
     return NextResponse.json(
       {
-        error:
-          e instanceof Error
-            ? `업로드 중 오류: ${e.message}`
-            : "파일 업로드 중 오류가 발생했습니다.",
+        error: msg ? `업로드 중 오류: ${msg}` : "파일 업로드 중 오류가 발생했습니다.",
       },
       { status: 500 },
     );

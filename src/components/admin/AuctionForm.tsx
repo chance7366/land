@@ -17,8 +17,11 @@ import {
   X,
 } from "lucide-react";
 import { FlyerPreviewModal } from "@/components/flyer/FlyerPreviewModal";
+import { WindowFlyerPreviewModal } from "@/components/flyer/WindowFlyerPreviewModal";
 import { mapAuctionToFlyer } from "@/lib/flyer/map-auction";
+import { mapAuctionToWindowFlyer } from "@/lib/flyer/map-auction-window";
 import type { FlyerViewModel } from "@/lib/flyer/types";
+import type { WindowFlyerViewModel } from "@/lib/flyer/window-types";
 import type { Auction } from "@prisma/client";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { AppLink as Link } from "@/components/ui/AppLink";
@@ -821,9 +824,11 @@ export function AuctionForm({ initial }: AuctionFormProps) {
     useState<AuctionReportModelId>(GEMINI_FLASH_MODEL);
   const [flyerOpen, setFlyerOpen] = useState(false);
   const [flyerData, setFlyerData] = useState<FlyerViewModel | null>(null);
+  const [windowFlyerOpen, setWindowFlyerOpen] = useState(false);
+  const [windowFlyerData, setWindowFlyerData] = useState<WindowFlyerViewModel | null>(null);
 
-  function openFlyerPreview() {
-    if (!initial?.id) return;
+  function buildAuctionFlyerSource() {
+    if (!initial?.id) return null;
     const appraisal = Number(moneyDigits(form.appraisalPrice)) || initial.appraisalPrice || null;
     const min =
       Number(moneyDigits(form.minPrice)) ||
@@ -841,29 +846,40 @@ export function AuctionForm({ initial }: AuctionFormProps) {
         : form.buildingArea !== "" && form.buildingArea != null
           ? Number(form.buildingArea)
           : initial.buildingArea;
-    setFlyerData(
-      mapAuctionToFlyer({
-        id: initial.id,
-        title: form.title || initial.title,
-        caseNumber: form.caseNumber || initial.caseNumber,
-        itemNo: form.itemNo || initial.itemNo,
-        court: form.court || initial.court,
-        address: form.address || initial.address,
-        address2: form.address2 || initial.address2,
-        appraisalPrice: appraisal,
-        minPrice: min,
-        recommendedPrice: min,
-        bidDeposit: Number(moneyDigits(form.bidDeposit)) || initial.bidDeposit,
-        saleDate: form.saleDate || initial.saleDate,
-        landArea: land,
-        buildingArea: building,
-        images,
-        rightsAnalysis: initial.rightsAnalysis,
-        description: form.appraisalSummary || form.chanceOpinion || initial.description,
-        memo: form.chanceOpinion || initial.memo,
-      }),
-    );
+    return {
+      id: initial.id,
+      title: form.title || initial.title,
+      caseNumber: form.caseNumber || initial.caseNumber,
+      itemNo: form.itemNo || initial.itemNo,
+      court: form.court || initial.court,
+      address: form.address || initial.address,
+      address2: form.address2 || initial.address2,
+      appraisalPrice: appraisal,
+      minPrice: min,
+      recommendedPrice: min,
+      bidDeposit: Number(moneyDigits(form.bidDeposit)) || initial.bidDeposit,
+      saleDate: form.saleDate || initial.saleDate,
+      landArea: land,
+      buildingArea: building,
+      images,
+      rightsAnalysis: initial.rightsAnalysis,
+      description: form.appraisalSummary || form.chanceOpinion || initial.description,
+      memo: form.chanceOpinion || initial.memo,
+    };
+  }
+
+  function openFlyerPreview() {
+    const src = buildAuctionFlyerSource();
+    if (!src) return;
+    setFlyerData(mapAuctionToFlyer(src));
     setFlyerOpen(true);
+  }
+
+  function openWindowFlyerPreview() {
+    const src = buildAuctionFlyerSource();
+    if (!src) return;
+    setWindowFlyerData(mapAuctionToWindowFlyer(src));
+    setWindowFlyerOpen(true);
   }
 
   function setMoneyField(key: keyof FormState, value: string) {
@@ -1117,16 +1133,34 @@ export function AuctionForm({ initial }: AuctionFormProps) {
       setError("사진은 최대 8장까지 등록할 수 있습니다.");
       return;
     }
+    const maxBytes = 4 * 1024 * 1024;
+    const selected = Array.from(fileList).slice(0, remaining);
+    const oversized = selected.find((f) => f.size > maxBytes);
+    if (oversized) {
+      setError(`「${oversized.name}」이(가) 4MB를 초과합니다. 압축 후 다시 올려 주세요.`);
+      if (photoRef.current) photoRef.current.value = "";
+      return;
+    }
     setUploading(true);
     setError("");
     try {
       const body = new FormData();
       body.append("kind", "auctions");
-      for (const file of Array.from(fileList).slice(0, remaining)) {
+      for (const file of selected) {
         body.append("files", file);
       }
       const res = await fetch("/api/admin/uploads", { method: "POST", body });
-      const data = (await res.json()) as { urls?: string[]; error?: string };
+      let data: { urls?: string[]; error?: string } = {};
+      try {
+        data = (await res.json()) as { urls?: string[]; error?: string };
+      } catch {
+        setError(
+          res.status === 413
+            ? "파일이 너무 큽니다. 각 4MB 이하로 올려 주세요."
+            : `업로드 실패 (HTTP ${res.status})`,
+        );
+        return;
+      }
       if (!res.ok) {
         setError(data.error ?? "업로드에 실패했습니다.");
         return;
@@ -2472,28 +2506,37 @@ export function AuctionForm({ initial }: AuctionFormProps) {
           <Section
             n={14}
             title="분석 리포트"
-            hint="일반리포트(1~3)와 회원리포트(1~7)를 분리 생성·관리합니다. A4 광고전단지는 Gemini 리포트와 별도입니다."
+            hint="일반·회원 리포트와 별도로 광고전단지(배포)·창문전단지(창부착)를 생성합니다."
           >
-            <div className="mb-4 rounded-2xl border-2 border-orange-400/45 bg-gradient-to-br from-orange-500/20 to-amber-500/10 p-4 md:p-5">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <span className="inline-flex rounded-full bg-orange-500/25 px-2.5 py-0.5 text-[11px] font-bold text-orange-100 ring-1 ring-orange-400/35">
-                    FLYER
-                  </span>
-                  <h3 className="mt-2 text-base font-bold text-white">A4 광고전단지</h3>
-                  <p className="mt-0.5 text-[12px] text-slate-300">
-                    1페이지 · 법정 명시 · 영업·현장용 (현재 폼 데이터 기준 미리보기)
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mb-4 grid gap-3 md:grid-cols-2">
+              <div className="rounded-2xl border-2 border-orange-400/45 bg-gradient-to-br from-orange-500/20 to-amber-500/10 p-4 md:p-5">
+                <span className="inline-flex rounded-full bg-orange-500/25 px-2.5 py-0.5 text-[11px] font-bold text-orange-100 ring-1 ring-orange-400/35">
+                  광고전단지
+                </span>
+                <h3 className="mt-2 text-base font-bold text-white">배포용 A4</h3>
+                <p className="mt-0.5 text-[12px] text-slate-300">주민·입주민 배포 · 법정 명시 충실</p>
                 <button
                   type="button"
                   onClick={openFlyerPreview}
-                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#4dabff] to-[#913dff] px-4 py-2.5 text-sm font-bold text-white"
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#4dabff] to-[#913dff] px-4 py-2.5 text-sm font-bold text-white"
                 >
                   <FileImage className="h-4 w-4" />
-                  전단지 생성 · 보기
+                  광고전단지 보기
+                </button>
+              </div>
+              <div className="rounded-2xl border-2 border-amber-300/45 bg-gradient-to-br from-amber-500/20 to-yellow-500/10 p-4 md:p-5">
+                <span className="inline-flex rounded-full bg-amber-500/25 px-2.5 py-0.5 text-[11px] font-bold text-amber-100 ring-1 ring-amber-400/35">
+                  창문전단지
+                </span>
+                <h3 className="mt-2 text-base font-bold text-white">창부착용 A4</h3>
+                <p className="mt-0.5 text-[12px] text-slate-300">사무실 창문 · 한눈 시인성 · 테두리</p>
+                <button
+                  type="button"
+                  onClick={openWindowFlyerPreview}
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl border border-amber-300/40 bg-amber-500/25 px-4 py-2.5 text-sm font-bold text-amber-50"
+                >
+                  <FileImage className="h-4 w-4" />
+                  창문전단지 보기
                 </button>
               </div>
             </div>
@@ -2696,11 +2739,21 @@ export function AuctionForm({ initial }: AuctionFormProps) {
               type="button"
               disabled={!isEdit || saving}
               onClick={openFlyerPreview}
-              title={isEdit ? "A4 광고전단지 미리보기" : "저장 후 수정 화면에서 생성할 수 있습니다"}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-orange-400/40 bg-orange-500/20 px-4 py-2 text-sm font-bold text-orange-100 disabled:opacity-40"
+              title={isEdit ? "광고전단지(배포용)" : "저장 후 수정 화면에서 생성할 수 있습니다"}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-orange-400/40 bg-orange-500/20 px-3 py-2 text-sm font-bold text-orange-100 disabled:opacity-40"
             >
               <FileImage className="h-3.5 w-3.5" />
               광고전단지
+            </button>
+            <button
+              type="button"
+              disabled={!isEdit || saving}
+              onClick={openWindowFlyerPreview}
+              title={isEdit ? "창문전단지(창부착용)" : "저장 후 수정 화면에서 생성할 수 있습니다"}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300/45 bg-amber-500/20 px-3 py-2 text-sm font-bold text-amber-100 disabled:opacity-40"
+            >
+              <FileImage className="h-3.5 w-3.5" />
+              창문전단지
             </button>
             <button
               type="button"
@@ -2719,6 +2772,11 @@ export function AuctionForm({ initial }: AuctionFormProps) {
         open={flyerOpen}
         onClose={() => setFlyerOpen(false)}
         data={flyerData}
+      />
+      <WindowFlyerPreviewModal
+        open={windowFlyerOpen}
+        onClose={() => setWindowFlyerOpen(false)}
+        data={windowFlyerData}
       />
 
       {toast && (
@@ -2767,9 +2825,9 @@ function Field({
   className?: string;
 }) {
   return (
-    <label className={`block text-xs text-slate-400 ${className}`}>
-      {label}
+    <div className={`block text-xs text-slate-400 ${className}`}>
+      <span className="block">{label}</span>
       <div className="mt-1">{children}</div>
-    </label>
+    </div>
   );
 }

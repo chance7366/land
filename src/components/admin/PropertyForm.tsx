@@ -16,11 +16,14 @@ import {
   X,
 } from "lucide-react";
 import { FlyerPreviewModal } from "@/components/flyer/FlyerPreviewModal";
+import { WindowFlyerPreviewModal } from "@/components/flyer/WindowFlyerPreviewModal";
 import {
   mapPropertyToFlyer,
   propertyFormToFlyerSource,
 } from "@/lib/flyer/map-property";
+import { mapPropertyToWindowFlyer } from "@/lib/flyer/map-property-window";
 import type { FlyerViewModel } from "@/lib/flyer/types";
+import type { WindowFlyerViewModel } from "@/lib/flyer/window-types";
 import { navigateTo } from "@/lib/navigate";
 import type { Property, PropertyCategory, PropertyType } from "@prisma/client";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -195,6 +198,8 @@ export function PropertyForm({ initial }: PropertyFormProps) {
   const [error, setError] = useState("");
   const [flyerOpen, setFlyerOpen] = useState(false);
   const [flyerData, setFlyerData] = useState<FlyerViewModel | null>(null);
+  const [windowFlyerOpen, setWindowFlyerOpen] = useState(false);
+  const [windowFlyerData, setWindowFlyerData] = useState<WindowFlyerViewModel | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isEdit = Boolean(initial);
 
@@ -202,6 +207,14 @@ export function PropertyForm({ initial }: PropertyFormProps) {
     if (!initial?.id) return;
     setFlyerData(mapPropertyToFlyer(propertyFormToFlyerSource(initial.id, form)));
     setFlyerOpen(true);
+  }
+
+  function openWindowFlyerPreview() {
+    if (!initial?.id) return;
+    setWindowFlyerData(
+      mapPropertyToWindowFlyer(propertyFormToFlyerSource(initial.id, form)),
+    );
+    setWindowFlyerOpen(true);
   }
 
   const category = form.category as PropertyCategory;
@@ -285,18 +298,38 @@ export function PropertyForm({ initial }: PropertyFormProps) {
     );
   }
 
+  function normalizeImageUrl(raw: string): string | null {
+    let u = raw.trim();
+    if (!u) return null;
+    if (!/^https?:\/\//i.test(u)) u = `https://${u}`;
+    try {
+      const parsed = new URL(u);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+      return parsed.toString();
+    } catch {
+      return null;
+    }
+  }
+
   function addImageUrl() {
-    if (!imageInput.trim()) return;
+    const url = normalizeImageUrl(imageInput);
+    if (!url) {
+      setError("올바른 이미지 URL을 입력하세요. (https://…)");
+      return;
+    }
     if (imageList.length >= MAX_IMAGES) {
       setError("사진은 최대 5장까지 등록할 수 있습니다.");
       return;
     }
-    if (imageList.includes(imageInput.trim())) {
+    if (imageList.includes(url)) {
       setError("이미 등록된 사진입니다.");
       return;
     }
     setError("");
-    setField("images", [...imageList, imageInput.trim()]);
+    setForm((prev) => ({
+      ...prev,
+      images: [...((prev.images as string[]) ?? []), url].slice(0, MAX_IMAGES),
+    }));
     setImageInput("");
   }
 
@@ -307,27 +340,49 @@ export function PropertyForm({ initial }: PropertyFormProps) {
       return;
     }
 
+    const maxBytes = 4 * 1024 * 1024;
     const selected = Array.from(fileList).slice(0, remainingSlots);
+    const oversized = selected.find((f) => f.size > maxBytes);
+    if (oversized) {
+      setError(`「${oversized.name}」이(가) 4MB를 초과합니다. 압축 후 다시 올려 주세요.`);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
     setUploading(true);
     setError("");
 
     try {
       const body = new FormData();
+      body.append("kind", "properties");
       for (const file of selected) {
         body.append("files", file);
       }
 
       const res = await fetch("/api/admin/uploads", { method: "POST", body });
-      const data = (await res.json()) as { urls?: string[]; error?: string };
+      let data: { urls?: string[]; error?: string } = {};
+      try {
+        data = (await res.json()) as { urls?: string[]; error?: string };
+      } catch {
+        setError(
+          res.status === 413
+            ? "파일이 너무 큽니다. 각 4MB 이하로 올려 주세요."
+            : `사진 업로드 실패 (HTTP ${res.status}). 잠시 후 다시 시도하거나 URL로 추가하세요.`,
+        );
+        return;
+      }
       if (!res.ok) {
         setError(data.error ?? "사진 업로드에 실패했습니다.");
         return;
       }
 
       const urls = data.urls ?? [];
-      setField("images", [...imageList, ...urls].slice(0, MAX_IMAGES));
+      setForm((prev) => ({
+        ...prev,
+        images: [...((prev.images as string[]) ?? []), ...urls].slice(0, MAX_IMAGES),
+      }));
     } catch {
-      setError("사진 업로드 중 오류가 발생했습니다.");
+      setError("사진 업로드 중 오류가 발생했습니다. 네트워크를 확인하거나 URL로 추가해 보세요.");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -981,7 +1036,7 @@ export function PropertyForm({ initial }: PropertyFormProps) {
 
           {wizardStep === 5 && (
             <>
-              <Section n={5} title="사진" hint="최대 5장 · JPG/PNG/WEBP/GIF · 각 5MB 이하 · 첫 번째가 대표 이미지">
+              <Section n={5} title="사진" hint="최대 5장 · JPG/PNG/WEBP/GIF · 각 4MB 이하 · 첫 번째가 대표 이미지">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -999,7 +1054,23 @@ export function PropertyForm({ initial }: PropertyFormProps) {
                       }`}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt={`매물 사진 ${i + 1}`} className="h-full w-full object-cover" />
+                      <img
+                        src={url}
+                        alt={`매물 사진 ${i + 1}`}
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          const el = e.currentTarget;
+                          el.style.display = "none";
+                          const fallback = el.nextElementSibling;
+                          if (fallback instanceof HTMLElement) fallback.hidden = false;
+                        }}
+                      />
+                      <div
+                        hidden
+                        className="flex h-full w-full items-center justify-center bg-white/10 p-1 text-center text-[9px] text-slate-400"
+                      >
+                        URL 등록됨
+                      </div>
                       {i === 0 && (
                         <span className="absolute left-1 top-1 rounded bg-[#913dff]/90 px-1.5 py-0.5 text-[9px] font-bold text-white">
                           대표
@@ -1035,25 +1106,33 @@ export function PropertyForm({ initial }: PropertyFormProps) {
                     </span>
                   </button>
                 </div>
-                <Field label="또는 URL로 추가" className="mt-4">
-                  <div className="flex gap-2">
+                <div className="mt-4 block text-xs text-slate-400">
+                  <span>또는 URL로 추가</span>
+                  <div className="mt-1 flex gap-2">
                     <input
                       className={inputClass}
                       value={imageInput}
                       onChange={(e) => setImageInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addImageUrl();
+                        }
+                      }}
                       disabled={remainingSlots <= 0}
                       placeholder="https://..."
+                      inputMode="url"
                     />
                     <button
                       type="button"
                       onClick={addImageUrl}
-                      disabled={remainingSlots <= 0}
-                      className="shrink-0 rounded-xl border border-white/15 px-4 text-sm text-slate-200 hover:bg-white/5 disabled:opacity-40"
+                      disabled={remainingSlots <= 0 || !imageInput.trim()}
+                      className="shrink-0 rounded-xl border border-white/15 px-4 text-sm font-semibold text-slate-200 hover:bg-white/5 disabled:opacity-40"
                     >
                       추가
                     </button>
                   </div>
-                </Field>
+                </div>
               </Section>
 
               <Section n={5} title="소유자 검증 · 설명 · 태그">
@@ -1164,11 +1243,21 @@ export function PropertyForm({ initial }: PropertyFormProps) {
               type="button"
               disabled={!isEdit || loading}
               onClick={openFlyerPreview}
-              title={isEdit ? "A4 광고전단지 미리보기" : "저장 후 수정 화면에서 생성할 수 있습니다"}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-orange-400/40 bg-orange-500/20 px-4 py-2 text-sm font-bold text-orange-100 disabled:opacity-40"
+              title={isEdit ? "광고전단지(배포용) 미리보기" : "저장 후 수정 화면에서 생성할 수 있습니다"}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-orange-400/40 bg-orange-500/20 px-3 py-2 text-sm font-bold text-orange-100 disabled:opacity-40"
             >
               <FileImage className="h-3.5 w-3.5" />
-              광고전단지 생성
+              광고전단지
+            </button>
+            <button
+              type="button"
+              disabled={!isEdit || loading}
+              onClick={openWindowFlyerPreview}
+              title={isEdit ? "창문전단지(창부착용) 미리보기" : "저장 후 수정 화면에서 생성할 수 있습니다"}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300/45 bg-amber-500/20 px-3 py-2 text-sm font-bold text-amber-100 disabled:opacity-40"
+            >
+              <FileImage className="h-3.5 w-3.5" />
+              창문전단지
             </button>
             <button
               type="button"
@@ -1187,6 +1276,11 @@ export function PropertyForm({ initial }: PropertyFormProps) {
         open={flyerOpen}
         onClose={() => setFlyerOpen(false)}
         data={flyerData}
+      />
+      <WindowFlyerPreviewModal
+        open={windowFlyerOpen}
+        onClose={() => setWindowFlyerOpen(false)}
+        data={windowFlyerData}
       />
     </div>
   );
@@ -1229,10 +1323,10 @@ function Field({
   className?: string;
 }) {
   return (
-    <label className={`block text-xs text-slate-400 ${className}`}>
-      {label}
+    <div className={`block text-xs text-slate-400 ${className}`}>
+      <span className="block">{label}</span>
       <div className="mt-1">{children}</div>
-    </label>
+    </div>
   );
 }
 

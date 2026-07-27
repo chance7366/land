@@ -105,6 +105,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(property, { status: 201 });
   } catch (e) {
     console.error("[admin/properties POST]", e);
-    return NextResponse.json({ error: "매물 등록 중 오류가 발생했습니다." }, { status: 500 });
+    const msg = e instanceof Error ? e.message : "";
+    return NextResponse.json(
+      {
+        error: msg
+          ? `매물 등록 중 오류: ${msg}`
+          : "매물 등록 중 오류가 발생했습니다.",
+      },
+      { status: 500 },
+    );
   }
 }

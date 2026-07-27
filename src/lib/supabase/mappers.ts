@@ -12,6 +12,19 @@ function sn(v: unknown): string | null {
 }
 
 export function mapPropertyRow(row: Record<string, unknown>) {
+  const specsObj =
+    row.specs && typeof row.specs === "object" && !Array.isArray(row.specs)
+      ? (row.specs as Record<string, unknown>)
+      : {};
+  const fromSpecs = <T,>(key: string, fallback: T): T => {
+    if (row[key] != null && row[key] !== "") return row[key] as T;
+    if (specsObj[key] != null && specsObj[key] !== "") return specsObj[key] as T;
+    // camelCase in specs
+    const camel = key.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+    if (specsObj[camel] != null && specsObj[camel] !== "") return specsObj[camel] as T;
+    return fallback;
+  };
+
   return {
     id: String(row.id),
     manageCode: String(row.manage_code ?? ""),
@@ -27,43 +40,64 @@ export function mapPropertyRow(row: Record<string, unknown>) {
     area: (row.area as string | null) ?? null,
     address: String(row.address ?? ""),
     region: String(row.region ?? ""),
-    sido: (row.sido as string | null) ?? null,
-    sigungu: (row.sigungu as string | null) ?? null,
-    eupmyeondong: (row.eupmyeondong as string | null) ?? null,
-    ri: (row.ri as string | null) ?? null,
-    jibunMain: (row.jibun_main as string | null) ?? null,
-    jibunSub: (row.jibun_sub as string | null) ?? null,
+    sido: (fromSpecs("sido", null) as string | null) ?? null,
+    sigungu: (fromSpecs("sigungu", null) as string | null) ?? null,
+    eupmyeondong: (fromSpecs("eupmyeondong", null) as string | null) ?? null,
+    ri: (fromSpecs("ri", null) as string | null) ?? null,
+    jibunMain: (fromSpecs("jibunMain", fromSpecs("jibun_main", null)) as string | null) ?? null,
+    jibunSub: (fromSpecs("jibunSub", fromSpecs("jibun_sub", null)) as string | null) ?? null,
     buildingName: (row.building_name as string | null) ?? null,
     exclusiveArea: row.exclusive_area == null ? null : Number(row.exclusive_area),
     supplyArea: row.supply_area == null ? null : Number(row.supply_area),
     floor: row.floor == null ? null : Number(row.floor),
     totalFloors: row.total_floors == null ? null : Number(row.total_floors),
-    direction: (row.direction as string | null) ?? null,
-    builtYear: row.built_year == null ? null : Number(row.built_year),
-    parking: (row.parking as string | null) ?? null,
-    rooms: row.rooms == null ? null : Number(row.rooms),
-    bathrooms: row.bathrooms == null ? null : Number(row.bathrooms),
-    unitDong: (row.unit_dong as string | null) ?? null,
-    unitHo: (row.unit_ho as string | null) ?? null,
-    maintenanceFee: row.maintenance_fee == null ? null : Number(row.maintenance_fee),
-    keyMoney: row.key_money == null ? null : Number(row.key_money),
-    keyMoneyHidden: Boolean(row.key_money_hidden),
-    vatIncluded: row.vat_included == null ? null : Boolean(row.vat_included),
-    businessType: (row.business_type as string | null) ?? null,
-    landCategory: (row.land_category as string | null) ?? null,
-    zoning: (row.zoning as string | null) ?? null,
-    loanStatus: (row.loan_status as string | null) ?? null,
-    moveInType: (row.move_in_type as string | null) ?? null,
-    featureSummary: (row.feature_summary as string | null) ?? null,
-    ownerName: (row.owner_name as string | null) ?? null,
-    ownerRelation: (row.owner_relation as string | null) ?? null,
-    ownerPhone: (row.owner_phone as string | null) ?? null,
-    clientName: (row.client_name as string | null) ?? null,
-    naverComplexId: (row.naver_complex_id as string | null) ?? null,
-    naverDongId: (row.naver_dong_id as string | null) ?? null,
-    specs: JSON.stringify(row.specs ?? {}),
+    direction: (fromSpecs("direction", null) as string | null) ?? null,
+    builtYear: (() => {
+      const v = fromSpecs<unknown>("builtYear", fromSpecs("built_year", null));
+      return v == null || v === "" ? null : Number(v);
+    })(),
+    parking: (fromSpecs("parking", null) as string | null) ?? null,
+    rooms: (() => {
+      const v = fromSpecs<unknown>("rooms", null);
+      return v == null || v === "" ? null : Number(v);
+    })(),
+    bathrooms: (() => {
+      const v = fromSpecs<unknown>("bathrooms", null);
+      return v == null || v === "" ? null : Number(v);
+    })(),
+    unitDong: (fromSpecs("unitDong", fromSpecs("unit_dong", null)) as string | null) ?? null,
+    unitHo: (fromSpecs("unitHo", fromSpecs("unit_ho", null)) as string | null) ?? null,
+    maintenanceFee: (() => {
+      const v = fromSpecs<unknown>("maintenanceFee", fromSpecs("maintenance_fee", null));
+      return v == null || v === "" ? null : Number(v);
+    })(),
+    keyMoney: (() => {
+      const v = fromSpecs<unknown>("keyMoney", fromSpecs("key_money", null));
+      return v == null || v === "" ? null : Number(v);
+    })(),
+    keyMoneyHidden: Boolean(fromSpecs("keyMoneyHidden", fromSpecs("key_money_hidden", false))),
+    vatIncluded: (() => {
+      const v = fromSpecs<unknown>("vatIncluded", fromSpecs("vat_included", null));
+      return v == null || v === "" ? null : Boolean(v);
+    })(),
+    businessType: (fromSpecs("businessType", fromSpecs("business_type", null)) as string | null) ?? null,
+    landCategory: (fromSpecs("landCategory", fromSpecs("land_category", null)) as string | null) ?? null,
+    zoning: (fromSpecs("zoning", null) as string | null) ?? null,
+    loanStatus: (fromSpecs("loanStatus", fromSpecs("loan_status", null)) as string | null) ?? null,
+    moveInType: (fromSpecs("moveInType", fromSpecs("move_in_type", null)) as string | null) ?? null,
+    featureSummary:
+      (fromSpecs("featureSummary", fromSpecs("feature_summary", null)) as string | null) ?? null,
+    ownerName: (fromSpecs("ownerName", fromSpecs("owner_name", null)) as string | null) ?? null,
+    ownerRelation:
+      (fromSpecs("ownerRelation", fromSpecs("owner_relation", null)) as string | null) ?? null,
+    ownerPhone: (fromSpecs("ownerPhone", fromSpecs("owner_phone", null)) as string | null) ?? null,
+    clientName: (fromSpecs("clientName", fromSpecs("client_name", null)) as string | null) ?? null,
+    naverComplexId:
+      (fromSpecs("naverComplexId", fromSpecs("naver_complex_id", null)) as string | null) ?? null,
+    naverDongId: (fromSpecs("naverDongId", fromSpecs("naver_dong_id", null)) as string | null) ?? null,
+    specs: JSON.stringify(specsObj),
     tags: JSON.stringify(row.tags ?? []),
-    moveInDate: (row.move_in_date as string | null) ?? null,
+    moveInDate: (fromSpecs("moveInDate", fromSpecs("move_in_date", null)) as string | null) ?? null,
     images: JSON.stringify(row.images ?? []),
     featured: Boolean(row.featured),
     status: String(row.status ?? "ACTIVE") as never,

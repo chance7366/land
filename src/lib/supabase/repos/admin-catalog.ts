@@ -16,6 +16,48 @@ export function propertyInputToRow(input: PropertyInput & { manageCode: string }
     input.isJeonse ??
     (input.dealSubType === "JEONSE" || (input.type === "RENT" && !input.monthlyRent));
 
+  /**
+   * 프로덕션 `properties` 테이블에 실제 존재하는 컬럼만 기록.
+   * 나머지(시군구·방향·소유자 등)는 specs JSON에 보존.
+   */
+  const baseSpecs =
+    input.specs && typeof input.specs === "object" && !Array.isArray(input.specs)
+      ? { ...input.specs }
+      : {};
+
+  const extended = {
+    sido: input.sido ?? null,
+    sigungu: input.sigungu ?? null,
+    eupmyeondong: input.eupmyeondong ?? null,
+    ri: input.ri ?? null,
+    jibunMain: input.jibunMain ?? null,
+    jibunSub: input.jibunSub ?? null,
+    unitDong: input.unitDong ?? null,
+    unitHo: input.unitHo ?? null,
+    direction: input.direction ?? null,
+    builtYear: input.builtYear ?? null,
+    parking: input.parking ?? null,
+    rooms: input.rooms ?? null,
+    bathrooms: input.bathrooms ?? null,
+    maintenanceFee: input.maintenanceFee ?? null,
+    keyMoney: input.keyMoney ?? null,
+    keyMoneyHidden: Boolean(input.keyMoneyHidden),
+    vatIncluded: input.vatIncluded ?? null,
+    businessType: input.businessType ?? null,
+    landCategory: input.landCategory ?? null,
+    zoning: input.zoning ?? null,
+    loanStatus: input.loanStatus ?? null,
+    moveInType: input.moveInType ?? null,
+    featureSummary: input.featureSummary ?? null,
+    ownerName: input.ownerName ?? null,
+    ownerRelation: input.ownerRelation ?? null,
+    ownerPhone: input.ownerPhone ?? null,
+    clientName: input.clientName ?? null,
+    naverComplexId: input.naverComplexId ?? null,
+    naverDongId: input.naverDongId ?? null,
+    moveInDate: input.moveInDate ?? null,
+  };
+
   return {
     manage_code: input.manageCode,
     title: input.title,
@@ -32,42 +74,14 @@ export function propertyInputToRow(input: PropertyInput & { manageCode: string }
     area: input.exclusiveArea != null ? String(input.exclusiveArea) : null,
     address: input.address ?? "",
     region: input.region ?? "내포신도시",
-    sido: input.sido ?? null,
-    sigungu: input.sigungu ?? null,
-    eupmyeondong: input.eupmyeondong ?? null,
-    ri: input.ri ?? null,
-    jibun_main: input.jibunMain ?? null,
-    jibun_sub: input.jibunSub ?? null,
-    unit_dong: input.unitDong ?? null,
-    unit_ho: input.unitHo ?? null,
     building_name: input.buildingName ?? null,
     exclusive_area: input.exclusiveArea ?? null,
     supply_area: input.supplyArea ?? null,
     floor: input.floor ?? null,
     total_floors: input.totalFloors ?? null,
-    direction: input.direction ?? null,
-    built_year: input.builtYear ?? null,
-    parking: input.parking ?? null,
-    rooms: input.rooms ?? null,
-    bathrooms: input.bathrooms ?? null,
-    maintenance_fee: input.maintenanceFee ?? null,
-    key_money: input.keyMoney ?? null,
-    key_money_hidden: Boolean(input.keyMoneyHidden),
-    vat_included: input.vatIncluded ?? null,
-    business_type: input.businessType ?? null,
-    land_category: input.landCategory ?? null,
-    zoning: input.zoning ?? null,
-    loan_status: input.loanStatus ?? null,
-    move_in_type: input.moveInType ?? null,
-    feature_summary: input.featureSummary ?? null,
-    owner_name: input.ownerName ?? null,
-    owner_relation: input.ownerRelation ?? null,
-    owner_phone: input.ownerPhone ?? null,
-    client_name: input.clientName ?? null,
-    move_in_date: input.moveInDate ?? null,
     images: input.images ?? [],
     tags: input.tags ?? [],
-    specs: input.specs ?? {},
+    specs: { ...baseSpecs, ...extended },
     featured: Boolean(input.featured),
     status: input.status ?? "ACTIVE",
     published_at: input.publishedAt
